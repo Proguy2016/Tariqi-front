@@ -72,9 +72,9 @@ class DriverActiveRideController extends GetxController {
     markers.addAll([
       Marker(
         point: currentLocation,
-        width: 40,
-        height: 40,
-        child: Image.asset('assets/images/car.png', width: 40, height: 40),
+        width: 100,
+        height: 100,
+        child: Image.asset('assets/images/car.png', width: 100, height: 100),
       ),
       Marker(
         point: destinationLocation,

@@ -6,6 +6,7 @@ import 'package:tariqi/const/class/screen_size.dart';
 import 'package:tariqi/const/colors/app_colors.dart';
 import 'package:tariqi/controller/intro_controller/splash_controller.dart';
 import 'package:tariqi/view/core_widgets/handling_view.dart';
+import 'dart:ui';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -15,115 +16,129 @@ class SplashScreen extends StatelessWidget {
     ScreenSize.init(context);
     final controller = Get.put(SplashController());
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: Container(
-            margin: EdgeInsets.only(
-              bottom: ScreenSize.screenHeight! * 0.05,
-              top: ScreenSize.screenHeight! * 0.1,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Background image
+          Image.asset(
+            'assets/images/background.png',
+            fit: BoxFit.cover,
+          ),
+          // Gradient overlay for better contrast
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.45),
+                  Colors.transparent,
+                  Colors.black.withOpacity(0.25),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
             ),
+          ),
+          SafeArea(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Column(
-                  spacing: ScreenSize.screenHeight! * 0.09,
-                  children: [
-                    _buildSplashLogo(),
-                    _safetyCheck(splashController: controller),
-                  ],
+                const SizedBox(height: 60),
+                // Logo and app name centered together
+                Center(
+                  child: Column(
+                    children: [
+                      Container(
+                        width: ScreenSize.screenWidth! * 0.22,
+                        height: ScreenSize.screenWidth! * 0.22,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.85),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 10,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18.0),
+                          child: Image.asset(
+                            'assets/images/logo.webp',
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        'Tariqi',
+                        style: TextStyle(
+                          fontSize: 68,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 2,
+                          shadows: [
+                            Shadow(
+                              color: Color(0xFF2979FF).withOpacity(0.7), // blue neon
+                              blurRadius: 24,
+                            ),
+                            Shadow(
+                              color: Colors.black.withOpacity(0.35),
+                              blurRadius: 8,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                _splashButton(splashController: controller),
+                const Spacer(),
+                // Get Started Button (as is, but with more bottom margin)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 36.0),
+                  child: SizedBox(
+                    width: ScreenSize.screenWidth! * 0.8,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.blueColor,
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(40),
+                        ),
+                        elevation: 10,
+                        shadowColor: AppColors.blueColor.withOpacity(0.4),
+                      ),
+                      onPressed: () {
+                        controller.navigateToLoginScreen();
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Text(
+                            'Get Started',
+                            style: TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          SizedBox(width: 16),
+                          Icon(
+                            Icons.arrow_circle_right_outlined,
+                            size: 32,
+                            color: Colors.white,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSplashLogo() {
-    return Container(
-      alignment: Alignment.center,
-      width: ScreenSize.screenWidth! * 0.4,
-      height: ScreenSize.screenHeight! * 0.2,
-      decoration: BoxDecoration(
-        color: AppColors.blueColor,
-        borderRadius: BorderRadius.circular(ScreenSize.screenWidth! * 0.2),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 3,
-            color: AppColors.whiteColor,
-            spreadRadius: 1,
-          ),
         ],
-      ),
-      child: Text(
-        "Tariqi",
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 40, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-
-  Widget _safetyCheck({required SplashController splashController}) {
-    return Obx(
-      () => HandlingView(
-        requestState: splashController.requestState.value,
-        widget: Container(
-          padding: EdgeInsets.symmetric(
-            vertical: ScreenSize.screenHeight! * 0.01,
-          ),
-          margin: EdgeInsets.symmetric(
-            horizontal: ScreenSize.screenWidth! * 0.12,
-          ),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.whiteColor),
-
-            borderRadius: BorderRadius.circular(ScreenSize.screenWidth! * 0.05),
-          ),
-
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: ScreenSize.screenWidth! * 0.03,
-            children: [
-              Text(
-                "Move with safety",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-              ),
-
-              Icon(Icons.check_circle_outline_sharp, size: 30),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _splashButton({required SplashController splashController}) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: ScreenSize.screenWidth! * 0.12),
-      child: MaterialButton(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(ScreenSize.screenWidth! * 0.03),
-        ),
-        padding: EdgeInsets.symmetric(
-          vertical: ScreenSize.screenHeight! * 0.012,
-        ),
-        color: AppColors.blueColor,
-        onPressed: () {
-          splashController.navigateToLoginScreen();
-        },
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: ScreenSize.screenWidth! * 0.03,
-          children: [
-            Text(
-              "Get Started",
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-            ),
-            Icon(Icons.arrow_circle_right_outlined, size: 30),
-          ],
-        ),
       ),
     );
   }
