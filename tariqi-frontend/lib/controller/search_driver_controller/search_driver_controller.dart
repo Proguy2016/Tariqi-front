@@ -27,11 +27,7 @@ class SearchDriverController extends GetxController {
     driverMarkers.add(
       Marker(
         point: driverPosition,
-        child: const Icon(
-          Icons.directions_car,
-          color: Colors.blue,
-          size: 30,
-        ),
+        child: const Icon(Icons.directions_car, color: Colors.blue, size: 30),
       ),
     );
     update();
@@ -48,7 +44,8 @@ class SearchDriverController extends GetxController {
 
   void setDriverFound() {
     driverFound.value = true;
-    driverInfo.value = "Driver: Mohamed Ashraf Mohamed\nCar: Red Toyota\nPlate: ABC-123";
+    driverInfo.value =
+        "Driver: Mohamed Ashraf Mohamed\nCar: Red Toyota\nPlate: ABC-123";
   }
 
   void resetDriverFound() {
@@ -74,13 +71,13 @@ class SearchingDriverController extends GetxController {
   }
 
   Future<void> checkForEligibleDriver() async {
-    const String ridesUrl = "${ApiEndpoints.baseUrl}/rides";
+    final String ridesUrl = "${ApiLinksKeys.baseUrl}/rides";
     final response = await http.get(Uri.parse(ridesUrl));
     if (response.statusCode == 200) {
       final rides = jsonDecode(response.body) as List;
-      final compatibleRide = rides.firstWhereOrNull((ride) =>
-        ride['availableSeats'] > 0 &&
-        ride['rideStatus'] == 'scheduled'
+      final compatibleRide = rides.firstWhereOrNull(
+        (ride) =>
+            ride['availableSeats'] > 0 && ride['rideStatus'] == 'scheduled',
         // Add more conditions if needed
       );
       if (compatibleRide != null) {
@@ -92,7 +89,7 @@ class SearchingDriverController extends GetxController {
   }
 
   Future<void> fetchDriverInfo(String driverId) async {
-    final String driverUrl = "${ApiEndpoints.baseUrl}/drivers/$driverId";
+    final String driverUrl = "${ApiLinksKeys.baseUrl}/drivers/$driverId";
     final response = await http.get(Uri.parse(driverUrl));
     if (response.statusCode == 200) {
       final driver = jsonDecode(response.body);

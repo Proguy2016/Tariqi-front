@@ -11,9 +11,43 @@ import 'package:tariqi/view/core_widgets/custom_form_field.dart';
 import 'package:tariqi/view/core_widgets/handling_view.dart';
 import 'package:tariqi/view/core_widgets/pop_widget.dart';
 import 'package:tariqi/const/class/request_state.dart';
+import 'package:intl/intl.dart';
 
 class SignupScreen extends StatelessWidget {
   const SignupScreen({super.key});
+
+  Future<void> _selectDate(
+    BuildContext context,
+    SignupController controller,
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(
+        const Duration(days: 365 * 18),
+      ), // Default to 18 years ago
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: AppColors.blueColor,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      controller.birthdayController.text = DateFormat(
+        'yyyy-MM-dd',
+      ).format(picked);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,12 +77,16 @@ class SignupScreen extends StatelessWidget {
                           _signUpPageHeader(),
                           _buildRoleSelection(controller),
                           _buildSignUpInputs(controller: controller),
-                          Obx(() => controller.selectedRole.value == "driver"
-                              ? _buildDriverInputs(controller: controller)
-                              : const SizedBox.shrink()),
+                          Obx(
+                            () =>
+                                controller.selectedRole.value == "driver"
+                                    ? _buildDriverInputs(controller: controller)
+                                    : const SizedBox.shrink(),
+                          ),
                           _signUpPageActions(
-                              signUpFunction: () => controller.signUpFunc(),
-                              controller: controller),
+                            signUpFunction: () => controller.signUpFunc(),
+                            controller: controller,
+                          ),
                         ],
                       ),
                     ),
@@ -84,68 +122,77 @@ class SignupScreen extends StatelessWidget {
       children: [
         const Text(
           "Select Account Type",
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
-              child: Obx(() => GestureDetector(
-                    onTap: () => controller.setRole("client"),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: controller.selectedRole.value == "client"
-                            ? AppColors.blueColor
-                            : Colors.white,
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          "Client",
-                          style: TextStyle(
-                            color: controller.selectedRole.value == "client"
-                                ? Colors.white
-                                : Colors.black,
-                            fontWeight: FontWeight.w500,
-                          ),
+              child: Obx(
+                () => GestureDetector(
+                  onTap: () => controller.setRole("client"),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          controller.selectedRole.value == "client"
+                              ? AppColors.blueColor
+                              : Colors.white,
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        "Client",
+                        style: TextStyle(
+                          color:
+                              controller.selectedRole.value == "client"
+                                  ? Colors.white
+                                  : Colors.black,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                  )),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 15),
             Expanded(
-              child: Obx(() => GestureDetector(
-                    onTap: () => controller.setRole("driver"),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: controller.selectedRole.value == "driver"
-                            ? AppColors.blueColor
-                            : Colors.white,
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Center(
-                        child: Text(
-                          "Driver",
-                          style: TextStyle(
-                            color: controller.selectedRole.value == "driver"
-                                ? Colors.white
-                                : Colors.black,
-                            fontWeight: FontWeight.w500,
-                          ),
+              child: Obx(
+                () => GestureDetector(
+                  onTap: () => controller.setRole("driver"),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color:
+                          controller.selectedRole.value == "driver"
+                              ? AppColors.blueColor
+                              : Colors.white,
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Center(
+                      child: Text(
+                        "Driver",
+                        style: TextStyle(
+                          color:
+                              controller.selectedRole.value == "driver"
+                                  ? Colors.white
+                                  : Colors.black,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
-                  )),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -192,21 +239,22 @@ class SignupScreen extends StatelessWidget {
                 );
               },
             ),
-            CustomFormField(
-              controller: controller.ageController,
-              hintText: "Enter Your Age",
-              labelText: "Age",
-              fieldIcon: const Icon(Icons.cake, size: 25),
-              textType: TextInputType.number,
-              validator: (val) {
-                return validFields(
-                  val: val!,
-                  type: "number",
-                  fieldName: "Age",
-                  maxVal: 100,
-                  minVal: 2,
-                );
-              },
+            GestureDetector(
+              onTap: () => _selectDate(Get.context!, controller),
+              child: AbsorbPointer(
+                child: CustomFormField(
+                  controller: controller.birthdayController,
+                  hintText: "Select Your Date of Birth",
+                  labelText: "Date of Birth",
+                  fieldIcon: const Icon(Icons.calendar_today, size: 25),
+                  validator: (val) {
+                    if (val == null || val.isEmpty) {
+                      return 'Please select your date of birth';
+                    }
+                    return null;
+                  },
+                ),
+              ),
             ),
             CustomFormField(
               validator: (val) {
@@ -223,27 +271,30 @@ class SignupScreen extends StatelessWidget {
               labelText: "Email",
               fieldIcon: const Icon(Icons.alternate_email, size: 25),
             ),
-            CustomFormField(
-              controller: controller.passwordController,
-              hintText: "Enter Your Password",
-              labelText: "Password",
-              secureText: controller.showPass.value,
-              validator: (val) {
-                return validFields(
-                  val: val!,
-                  type: "password",
-                  fieldName: "Password",
-                  maxVal: 30,
-                  minVal: 6,
-                );
-              },
-              fieldIcon: IconButton(
-                onPressed: () {
-                  controller.toggleShowPass();
+            Obx(
+              () => CustomFormField(
+                controller: controller.passwordController,
+                hintText: "Enter Your Password",
+                labelText: "Password",
+                secureText: controller.showPass.value,
+                validator: (val) {
+                  return validFields(
+                    val: val!,
+                    type: "password",
+                    fieldName: "Password",
+                    maxVal: 30,
+                    minVal: 6,
+                  );
                 },
-                icon: controller.showPass.value
-                    ? const Icon(Icons.visibility_off_outlined, size: 25)
-                    : const Icon(Icons.visibility_outlined, size: 25),
+                fieldIcon: IconButton(
+                  onPressed: () {
+                    controller.toggleShowPass();
+                  },
+                  icon:
+                      controller.showPass.value
+                          ? const Icon(Icons.visibility_off_outlined, size: 25)
+                          : const Icon(Icons.visibility_outlined, size: 25),
+                ),
               ),
             ),
             CustomFormField(
@@ -274,10 +325,7 @@ class SignupScreen extends StatelessWidget {
         const SizedBox(height: 15),
         const Text(
           "Car Details",
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 15),
         CustomFormField(
@@ -347,9 +395,10 @@ class SignupScreen extends StatelessWidget {
     );
   }
 
-  Widget _signUpPageActions(
-      {required void Function() signUpFunction,
-      required SignupController controller}) {
+  Widget _signUpPageActions({
+    required void Function() signUpFunction,
+    required SignupController controller,
+  }) {
     return Column(
       spacing: ScreenSize.screenWidth! * 0.08,
       children: [

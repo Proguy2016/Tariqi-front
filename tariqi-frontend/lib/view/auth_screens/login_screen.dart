@@ -112,32 +112,31 @@ class LoginScreen extends StatelessWidget {
               labelText: "Email",
               fieldIcon: Icon(Icons.alternate_email, size: 25),
             ),
-            GetBuilder<LoginController>(
-              builder:
-                  (controller) => CustomFormField(
-                    secureText: controller.showPassword.value,
-                    validator: (val) {
-                      return validFields(
-                        val: val!,
-                        type: "password",
-                        fieldName: "Password",
-                        maxVal: 30,
-                        minVal: 6,
-                      );
-                    },
-                    controller: controller.passwordController,
-                    hintText: "Enter Your Password",
-                    labelText: "Password",
-                    fieldIcon: IconButton(
-                      onPressed: () {
-                        controller.toggleShowPass();
-                      },
-                      icon:
-                          controller.showPassword.value
-                              ? Icon(Icons.visibility_off_outlined, size: 25)
-                              : Icon(Icons.visibility_outlined, size: 25),
-                    ),
-                  ),
+            Obx(
+              () => CustomFormField(
+                secureText: controller.showPassword.value,
+                validator: (val) {
+                  return validFields(
+                    val: val!,
+                    type: "password",
+                    fieldName: "Password",
+                    maxVal: 30,
+                    minVal: 6,
+                  );
+                },
+                controller: controller.passwordController,
+                hintText: "Enter Your Password",
+                labelText: "Password",
+                fieldIcon: IconButton(
+                  onPressed: () {
+                    controller.toggleShowPass();
+                  },
+                  icon:
+                      controller.showPassword.value
+                          ? Icon(Icons.visibility_off_outlined, size: 25)
+                          : Icon(Icons.visibility_outlined, size: 25),
+                ),
+              ),
             ),
           ],
         ),
@@ -148,7 +147,7 @@ class LoginScreen extends StatelessWidget {
   Widget _loginPageActions({
     required void Function()? googleLogin,
     required void Function() loginFunction,
-    required void Function() goToSignUpFunction, 
+    required void Function() goToSignUpFunction,
     required LoginController Controller,
     required loading,
   }) {
@@ -156,16 +155,16 @@ class LoginScreen extends StatelessWidget {
       spacing: ScreenSize.screenWidth! * 0.08,
       children: [
         Obx(() {
-  if (Controller.requestState.value == loading) {
-    return CircularProgressIndicator(color: AppColors.blueColor);
-  }
-  return CustomBtn(
-    btnColor: AppColors.blueColor,
-    btnFunc: loginFunction,
-    textColor: Colors.white,
-    text: "Login",
-  );
-}),
+          if (Controller.requestState.value == loading) {
+            return CircularProgressIndicator(color: AppColors.blueColor);
+          }
+          return CustomBtn(
+            btnColor: AppColors.blueColor,
+            btnFunc: loginFunction,
+            textColor: Colors.white,
+            text: "Login",
+          );
+        }),
         SizedBox(height: ScreenSize.screenHeight! * 0.025),
         Center(
           child: InkWell(

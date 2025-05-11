@@ -18,8 +18,8 @@ class SignupController extends GetxController {
   late TextEditingController drivingLicenseController;
   late TextEditingController firstNameController;
   late TextEditingController lastNameController;
-  late TextEditingController ageController;
-  
+  late TextEditingController birthdayController;
+
   final showPass = true.obs;
   final selectedRole = "client".obs;
   final requestState = RequestState.none.obs;
@@ -42,14 +42,15 @@ class SignupController extends GetxController {
       try {
         requestState.value = RequestState.loading;
 
-        final String apiEndpoint = selectedRole.value == 'driver'
-            ? ApiLinksKeys.driverSignupUrl
-            : ApiLinksKeys.clientSignupUrl;
+        final String apiEndpoint =
+            selectedRole.value == 'driver'
+                ? ApiLinksKeys.driverSignupUrl
+                : ApiLinksKeys.clientSignupUrl;
 
         final Map<String, dynamic> requestBody = {
           'firstName': firstNameController.text.trim(),
           'lastName': lastNameController.text.trim(),
-          'age': int.tryParse(ageController.text.trim()) ?? 0,
+          'birthday': birthdayController.text.trim(),
           'phoneNumber': mobileController.text.trim(),
           'email': emailController.text.trim(),
           'password': passwordController.text,
@@ -83,12 +84,15 @@ class SignupController extends GetxController {
             Get.offAllNamed(
               selectedRole.value == 'driver'
                   ? AppRoutesNames.driverHomeScreen
-                  : AppRoutesNames.homeScreen
+                  : AppRoutesNames.homeScreen,
             );
           } else {
             requestState.value = RequestState.failed;
-            Get.snackbar('Error', 'Signup succeeded but no token returned.',
-                snackPosition: SnackPosition.BOTTOM);
+            Get.snackbar(
+              'Error',
+              'Signup succeeded but no token returned.',
+              snackPosition: SnackPosition.BOTTOM,
+            );
           }
         } else {
           requestState.value = RequestState.failed;
@@ -103,8 +107,11 @@ class SignupController extends GetxController {
         }
       } catch (e) {
         requestState.value = RequestState.error;
-        Get.snackbar('Error', 'An unexpected error occurred: $e',
-            snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar(
+          'Error',
+          'An unexpected error occurred: $e',
+          snackPosition: SnackPosition.BOTTOM,
+        );
       }
     }
   }
@@ -113,7 +120,7 @@ class SignupController extends GetxController {
   void onInit() {
     firstNameController = TextEditingController();
     lastNameController = TextEditingController();
-    ageController = TextEditingController();
+    birthdayController = TextEditingController();
     emailController = TextEditingController();
     passwordController = TextEditingController();
     mobileController = TextEditingController();
@@ -128,7 +135,7 @@ class SignupController extends GetxController {
   void onClose() {
     firstNameController.dispose();
     lastNameController.dispose();
-    ageController.dispose();
+    birthdayController.dispose();
     emailController.dispose();
     passwordController.dispose();
     mobileController.dispose();

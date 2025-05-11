@@ -5,7 +5,7 @@ import 'package:tariqi/controller/auth_controllers/auth_controller.dart';
 import 'package:tariqi/services/driver_service.dart';
 
 void main() async {
-   WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
   final authController = Get.put(AuthController());
   Get.put(DriverService(), permanent: true);
   await authController.loadToken();
