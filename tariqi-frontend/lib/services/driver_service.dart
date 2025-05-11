@@ -11,6 +11,8 @@ import 'package:tariqi/controller/driver/driver_home_controller.dart';
 
 import '../controller/driver/driver_active_ride_controller.dart';
 import 'package:http/http.dart' as http;
+import 'package:tariqi/models/app_notification.dart';
+import 'package:tariqi/models/chat_message.dart';
 
 class DriverService extends GetConnect {
   String? currentRideId;
@@ -168,13 +170,16 @@ class DriverService extends GetConnect {
     log("🧰 Destination text: $destination");
     log("🧰 Max passengers: $maxPassengers");
     
+    // Format the current time in UTC with microseconds precision
+    final now = DateTime.now().toUtc();
+    final rideTime = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}T${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}.${now.microsecond.toString().padLeft(6, '0')}Z";
+    
     final body = {
       "route": [
         { "lat": startLocation.latitude, "lng": startLocation.longitude },  // Driver Pickup
         { "lat": endLat, "lng": endLong }   // Driver Dropoff
       ],
-      "availableSeats": maxPassengers,
-      "rideTime": DateTime.now().toIso8601String(), // Adding required rideTime field
+      "availableSeats": maxPassengers
     };
 
     // Use the API endpoints class instead of hardcoding
@@ -348,21 +353,31 @@ class DriverService extends GetConnect {
     try {
       final authController = Get.find<AuthController>();
       final response = await http.get(
-        Uri.parse("${ApiEndpoints.baseUrl}/driver/ride/$rideId/requests"),
+        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/pending/$rideId"),
         headers: {
           'Authorization': 'Bearer ${authController.token.value}',
           'Content-Type': 'application/json',
         },
       );
-      
-      log("🛑 Pending requests response: ${response.statusCode}");
+      log("🛑 Pending requests response status: ${response.statusCode}");
+      log("🛑 Pending requests response body: ${response.body}");
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['requests'] ?? [];
+        if (data is List) {
+          log("✅ Received list of pending requests: ${data.length} requests");
+          return data;
+        } else if (data is Map && data.containsKey('requests')) {
+          log("✅ Received map with requests field: ${data['requests']?.length ?? 0} requests");
+          return data['requests'] ?? [];
+        } else {
+          log("⚠️ Unexpected response format: $data");
+          return [];
+        }
+      } else {
+        log("❌ Failed to get pending requests: ${response.statusCode} - ${response.body}");
+        return [];
       }
-      
-      return [];
     } catch (e) {
       log("❌ Error getting pending requests: $e");
       return [];
@@ -575,5 +590,136 @@ class DriverService extends GetConnect {
     
     log("❌ All endpoints failed for ride ID: $rideId");
     return null;
+  }
+
+  Future<bool> approveJoinRequest(String requestId, bool approved) async {
+    try {
+      final authController = Get.find<AuthController>();
+      final response = await http.put(
+        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/$requestId/approve"),
+        headers: {
+          'Authorization': 'Bearer ${authController.token.value}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({"approved": approved}),
+      );
+      log("🛑 Approve join request response: [33m${response.statusCode}");
+      return response.statusCode == 200;
+    } catch (e) {
+      log("❌ Error approving join request: $e");
+      return false;
+    }
+  }
+
+  Future<bool> pickupPassenger(String requestId) async {
+    try {
+      final authController = Get.find<AuthController>();
+      final response = await http.put(
+        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/$requestId/pickup"),
+        headers: {
+          'Authorization': 'Bearer ${authController.token.value}',
+          'Content-Type': 'application/json',
+        },
+      );
+      log("🛑 Pickup passenger response: [33m${response.statusCode}");
+      return response.statusCode == 200;
+    } catch (e) {
+      log("❌ Error picking up passenger: $e");
+      return false;
+    }
+  }
+
+  Future<bool> dropoffPassenger(String requestId) async {
+    try {
+      final authController = Get.find<AuthController>();
+      final response = await http.put(
+        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/$requestId/dropoff"),
+        headers: {
+          'Authorization': 'Bearer ${authController.token.value}',
+          'Content-Type': 'application/json',
+        },
+      );
+      log("🛑 Dropoff passenger response: [33m${response.statusCode}");
+      return response.statusCode == 200;
+    } catch (e) {
+      log("❌ Error dropping off passenger: $e");
+      return false;
+    }
+  }
+}
+
+class NotificationService {
+  static const String baseUrl = ApiEndpoints.baseUrl;
+
+  static Future<List<AppNotification>> fetchNotifications(String token) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/notifications'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      return data.map((n) => AppNotification.fromJson(n)).toList();
+    }
+    throw Exception('Failed to fetch notifications');
+  }
+
+  static Future<void> sendNotification(String token, Map<String, dynamic> payload) async {
+    await http.post(
+      Uri.parse('$baseUrl/notifications'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode(payload),
+    );
+  }
+}
+
+class ChatService {
+  static const String baseUrl = ApiEndpoints.baseUrl;
+
+  static Future<void> createChatRoom(String token, String rideId) async {
+    await http.post(
+      Uri.parse('$baseUrl/chat/$rideId'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+  }
+
+  static Future<List<ChatMessage>> fetchMessages(String token, String rideId) async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/chat/$rideId/messages'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    log('🟦 Chat fetch response (${response.statusCode}): ${response.body}');
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+      log('🟦 Chat parsed messages: $data');
+      return data.map((m) => ChatMessage.fromJson(m)).toList();
+    }
+    throw Exception('Failed to fetch chat messages');
+  }
+
+  static Future<void> sendMessage(String token, String rideId, String message) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/chat/$rideId/messages'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'content': message}),
+    );
+    log('🟧 Chat send response (${response.statusCode}): ${response.body}');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to send message: ${response.body}');
+    }
   }
 }

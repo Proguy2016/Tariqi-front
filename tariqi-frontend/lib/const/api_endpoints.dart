@@ -19,4 +19,5 @@ class ApiEndpoints {
   static const String userRespondToRequest = '$baseUrl/user/respond/to/request'; // Append ride_id when calling
   static const String userSetLocation = '$baseUrl/user/set/location';
   static const String userGetRideData = '$baseUrl/user/get/ride/data'; // Append ride_id when calling
+
 }

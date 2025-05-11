@@ -9,6 +9,8 @@ import 'package:tariqi/view/success_screen/success_create_ride.dart';
 import 'package:tariqi/view/search_driver_screen/search_driver_screen.dart';
 import 'package:tariqi/view/driver/driver_active_ride_screen.dart';
 import 'package:tariqi/view/driver/driver_home_screen.dart';
+import 'package:tariqi/view/core_widgets/notification_screen.dart';
+import 'package:tariqi/view/core_widgets/chat_screen.dart';
 /// This file defines the application's route configuration using the GetX package.
 ///
 /// It imports necessary screens and middleware, and sets up a list of `GetPage`
@@ -40,5 +42,13 @@ List<GetPage<dynamic>> routes = [
 GetPage(
   name: AppRoutesNames.driverActiveRideScreen,
   page: () => const DriverActiveRideScreen(),
+),
+GetPage(
+  name: '/notifications',
+  page: () => const NotificationScreen(),
+),
+GetPage(
+  name: '/chat',
+  page: () => const ChatScreen(),
 ),
 ];

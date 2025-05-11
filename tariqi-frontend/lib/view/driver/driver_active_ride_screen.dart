@@ -74,7 +74,16 @@ class DriverActiveRideScreen extends StatelessWidget {
         centerTitle: true,
         elevation: 0,
         actions: [
-          // Add end ride button to app bar
+          IconButton(
+            icon: const Icon(Icons.chat, color: Colors.white),
+            onPressed: () => Get.toNamed('/chat', arguments: {'rideId': controller.rideId}),
+            tooltip: "Chat",
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications, color: Colors.white),
+            onPressed: () => Get.toNamed('/notifications'),
+            tooltip: "Notifications",
+          ),
           IconButton(
             icon: const Icon(Icons.stop_circle_outlined, color: Colors.red),
             onPressed: () => _showEndRideDialog(controller),
@@ -435,16 +444,42 @@ class DriverActiveRideScreen extends StatelessWidget {
                             "Rating: ${passenger['rating'] ?? '0.0'}",
                             style: const TextStyle(color: Colors.grey),
                           ),
-                          trailing: ElevatedButton.icon(
-                            onPressed: () => controller.endClientRide(passenger['id']),
-                            icon: const Icon(Icons.exit_to_app, size: 16),
-                            label: const Text("Drop Off"),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.orange,
-                              foregroundColor: Colors.white,
-                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              textStyle: TextStyle(fontSize: 12),
-                            ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!(passenger['pickedUp'] ?? false))
+                                ElevatedButton.icon(
+                                  onPressed: () => controller.pickupPassenger(passenger['id']),
+                                  icon: const Icon(Icons.person_pin_circle, size: 16),
+                                  label: const Text("Pick Up"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    textStyle: TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              if ((passenger['pickedUp'] ?? false) && !(passenger['droppedOff'] ?? false))
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8.0),
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => controller.dropoffPassenger(passenger['id']),
+                                    icon: const Icon(Icons.exit_to_app, size: 16),
+                                    label: const Text("Drop Off"),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                      foregroundColor: Colors.white,
+                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      textStyle: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ),
+                              if ((passenger['pickedUp'] ?? false) && (passenger['droppedOff'] ?? false))
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8.0),
+                                  child: Icon(Icons.check_circle, color: Colors.green, size: 20),
+                                ),
+                            ],
                           ),
                         );
                       },

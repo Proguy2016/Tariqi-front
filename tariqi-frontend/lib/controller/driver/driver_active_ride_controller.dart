@@ -14,6 +14,9 @@ import 'dart:developer' as dev;
 import 'package:http/http.dart' as http;
 import 'package:tariqi/controller/auth_controllers/auth_controller.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:tariqi/models/chat_message.dart';
+import 'package:tariqi/services/driver_service.dart';
+import 'package:tariqi/controller/auth_controllers/auth_controller.dart';
 
 // Global variable to hold route data
 RxList<dynamic> routes = <dynamic>[].obs;
@@ -71,7 +74,7 @@ class DriverActiveRideController extends GetxController {
         point: currentLocation,
         width: 40,
         height: 40,
-        child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+        child: Image.asset('assets/images/car.png', width: 40, height: 40),
       ),
       Marker(
         point: destinationLocation,
@@ -571,7 +574,7 @@ class DriverActiveRideController extends GetxController {
         point: currentLocation,
         width: 40,
         height: 40,
-        child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+        child: Image.asset('assets/images/car.png', width: 40, height: 40),
       ),
       Marker(
         point: destinationLocation,
@@ -646,7 +649,7 @@ class DriverActiveRideController extends GetxController {
         point: currentLocation,
         width: 40,
         height: 40,
-        child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+        child: Image.asset('assets/images/car.png', width: 40, height: 40),
       ),
       Marker(
         point: destinationLocation,
@@ -1005,7 +1008,7 @@ class DriverActiveRideController extends GetxController {
         point: currentLocation,
         width: 40,
         height: 40,
-        child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+        child: Image.asset('assets/images/car.png', width: 40, height: 40),
       ),
       Marker(
         point: destinationLocation,
@@ -1089,7 +1092,7 @@ class DriverActiveRideController extends GetxController {
           point: newLocation,
           width: 40,
           height: 40,
-          child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+          child: Image.asset('assets/images/car.png', width: 40, height: 40),
         );
       }
       
@@ -1203,90 +1206,110 @@ class DriverActiveRideController extends GetxController {
   }
 
   Future<void> fetchPendingRequests() async {
-    if (rideId == null || rideId!.isEmpty) return;
+    if (rideId == null || rideId!.isEmpty) {
+      dev.log("❌ Cannot fetch pending requests: No ride ID available");
+      return;
+    }
     
     try {
       // Skip if we already have a pending request
-      if (hasPendingRequest.value) return;
+      if (hasPendingRequest.value) {
+        dev.log("ℹ️ Skipping pending requests fetch: Already have a pending request");
+        return;
+      }
+      
+      dev.log("🔄 Fetching pending requests for ride ID: $rideId");
       
       // Fetch pending requests from API
       final requests = await _driverService.getPendingRequests(rideId!);
       
-      if (requests.isNotEmpty) {
-        // Get the newest request
-        final request = requests.first;
-        
-        // Calculate distance between driver and pickup location
-        double pickupDistanceKm = 0.0;
-        int pickupTimeMinutes = 3; // Default value
-        
-        try {
-          if (request['pickupLocation'] != null && 
-              request['pickupLocation']['lat'] != null && 
-              request['pickupLocation']['lng'] != null) {
-            
-            final pickupLat = request['pickupLocation']['lat'] as double;
-            final pickupLng = request['pickupLocation']['lng'] as double;
-            final pickupLocation = LatLng(pickupLat, pickupLng);
-            
-            // Calculate distance to pickup
-            pickupDistanceKm = _computeDistanceKm(currentLocation, pickupLocation);
-            
-            // Estimate pickup time (assuming 30 km/h average speed)
-            const avgSpeedKmh = 30.0;
-            pickupTimeMinutes = (pickupDistanceKm / avgSpeedKmh * 60).round();
-            if (pickupTimeMinutes < 1) pickupTimeMinutes = 1;
-          }
-        } catch (e) {
-          dev.log("⚠️ Error calculating pickup distance: $e");
-        }
-        
-        // Estimate potential earnings (based on distance to destination)
-        String estimatedEarnings = "SAR 15-20"; // Default fallback
-        
-        try {
-          // Simple calculation based on distance
-          final double baseRate = 10.0; // Base fare in SAR
-          final double perKmRate = 2.0; // SAR per km
-          
-          // Use the total ride distance for earnings estimate
-          final double estimatedFare = baseRate + (distanceKm * perKmRate);
-          final double minFare = (estimatedFare * 0.9).round().toDouble(); // 10% lower bound
-          final double maxFare = (estimatedFare * 1.1).round().toDouble(); // 10% upper bound
-          
-          estimatedEarnings = "SAR ${minFare.toInt()}-${maxFare.toInt()}";
-        } catch (e) {
-          dev.log("⚠️ Error calculating estimated earnings: $e");
-        }
-        
-        // Set the pending request with enhanced data
-        pendingRequest.value = {
-          'id': request['_id'] ?? '',
-          'name': request['user']?['name'] ?? 'New Passenger',
-          'rating': request['user']?['rating'] ?? 5.0,
-          'profilePic': request['user']?['profilePic'] ?? 'https://via.placeholder.com/150',
-          'pickup': request['pickupLocation']?['address'] ?? 'Unknown location',
-          'pickupDistanceKm': pickupDistanceKm,
-          'pickupTimeMinutes': pickupTimeMinutes,
-          'estimatedEarnings': estimatedEarnings,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        };
-        
-        // Play notification sound
-        _playRequestNotification();
-        
-        // Set the pending request flag to show the notification
-        hasPendingRequest.value = true;
-        
-        // Auto-decline after 30 seconds if not handled
-        Future.delayed(const Duration(seconds: 30), () {
-          if (hasPendingRequest.value && 
-              pendingRequest.value.isNotEmpty &&
-              pendingRequest.value['id'] == request['_id']) {
-            declineRequest();
-          }
-        });
+      if (requests.isEmpty) {
+        dev.log("ℹ️ No pending requests found");
+        return;
       }
+      
+      dev.log("✅ Found ${requests.length} pending requests");
+      
+      // Get the newest request
+      final request = requests.first;
+      dev.log("📝 Processing request: ${request['_id']}");
+      
+      // Calculate distance between driver and pickup location
+      double pickupDistanceKm = 0.0;
+      int pickupTimeMinutes = 3; // Default value
+      
+      try {
+        if (request['pickupLocation'] != null && 
+            request['pickupLocation']['lat'] != null && 
+            request['pickupLocation']['lng'] != null) {
+          
+          final pickupLat = request['pickupLocation']['lat'] as double;
+          final pickupLng = request['pickupLocation']['lng'] as double;
+          final pickupLocation = LatLng(pickupLat, pickupLng);
+          
+          // Calculate distance to pickup
+          pickupDistanceKm = _computeDistanceKm(currentLocation, pickupLocation);
+          dev.log("📍 Pickup distance: ${pickupDistanceKm.toStringAsFixed(2)} km");
+          
+          // Estimate pickup time (assuming 30 km/h average speed)
+          const avgSpeedKmh = 30.0;
+          pickupTimeMinutes = (pickupDistanceKm / avgSpeedKmh * 60).round();
+          if (pickupTimeMinutes < 1) pickupTimeMinutes = 1;
+          dev.log("⏱️ Estimated pickup time: $pickupTimeMinutes minutes");
+        }
+      } catch (e) {
+        dev.log("⚠️ Error calculating pickup distance: $e");
+      }
+      
+      // Estimate potential earnings (based on distance to destination)
+      String estimatedEarnings = "SAR 15-20"; // Default fallback
+      
+      try {
+        // Simple calculation based on distance
+        final double baseRate = 10.0; // Base fare in SAR
+        final double perKmRate = 2.0; // SAR per km
+        
+        // Use the total ride distance for earnings estimate
+        final double estimatedFare = baseRate + (distanceKm * perKmRate);
+        final double minFare = (estimatedFare * 0.9).round().toDouble(); // 10% lower bound
+        final double maxFare = (estimatedFare * 1.1).round().toDouble(); // 10% upper bound
+        
+        estimatedEarnings = "SAR ${minFare.toInt()}-${maxFare.toInt()}";
+        dev.log("💰 Estimated earnings: $estimatedEarnings");
+      } catch (e) {
+        dev.log("⚠️ Error calculating estimated earnings: $e");
+      }
+      
+      // Set the pending request with enhanced data
+      pendingRequest.value = {
+        'id': request['_id'] ?? '',
+        'name': request['user']?['name'] ?? 'New Passenger',
+        'rating': request['user']?['rating'] ?? 5.0,
+        'profilePic': request['user']?['profilePic'] ?? 'https://via.placeholder.com/150',
+        'pickup': request['pickupLocation']?['address'] ?? 'Unknown location',
+        'pickupDistanceKm': pickupDistanceKm,
+        'pickupTimeMinutes': pickupTimeMinutes,
+        'estimatedEarnings': estimatedEarnings,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      };
+      
+      dev.log("✅ Set pending request data: ${pendingRequest.value}");
+      
+      // Play notification sound
+      await _playRequestNotification();
+      
+      // Set the pending request flag to show the notification
+      hasPendingRequest.value = true;
+      
+      // Auto-decline after 30 seconds if not handled
+      Future.delayed(const Duration(seconds: 30), () {
+        if (hasPendingRequest.value && 
+            pendingRequest.value.isNotEmpty &&
+            pendingRequest.value['id'] == request['_id']) {
+          dev.log("⏰ Auto-declining request after timeout");
+          declineRequest();
+        }
+      });
     } catch (e) {
       dev.log("❌ Error fetching pending requests: $e");
     }
@@ -1307,32 +1330,40 @@ class DriverActiveRideController extends GetxController {
       Get.snackbar('Error', 'Invalid request ID');
       return;
     }
-    
     try {
       requestState.value = RequestState.loading;
-      
-      await _driverService.acceptRideRequest(pendingRequest['id']);
-      
-      // Add to passengers list
-      passengers.add(pendingRequest);
-      
-      // Clear pending request
-      hasPendingRequest.value = false;
-      pendingRequest.clear();
-      
-      requestState.value = RequestState.online;
-      
-      Get.snackbar(
-        'Request Accepted', 
-        'Passenger has been added to your ride',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      final approved = await _driverService.approveJoinRequest(pendingRequest['id'], true);
+      if (approved) {
+        // Add to passengers list with status
+        passengers.add({
+          ...pendingRequest,
+          'status': 'approved',
+          'pickedUp': false,
+          'droppedOff': false,
+        });
+        hasPendingRequest.value = false;
+        pendingRequest.clear();
+        requestState.value = RequestState.online;
+        Get.snackbar(
+          'Request Accepted',
+          'Passenger has been added to your ride',
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+        );
+      } else {
+        requestState.value = RequestState.failed;
+        Get.snackbar(
+          'Error',
+          'Failed to approve request',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
     } catch (e) {
       requestState.value = RequestState.failed;
       Get.snackbar(
-        'Error', 
-        'Failed to accept request: ${e.toString()}',
+        'Error',
+        'Failed to accept request: [31m${e.toString()}',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -1345,22 +1376,104 @@ class DriverActiveRideController extends GetxController {
       pendingRequest.clear();
       return;
     }
-    
     try {
       requestState.value = RequestState.loading;
-      
-      await _driverService.declineRideRequest(pendingRequest['id']);
-      
-      // Clear pending request
+      final declined = await _driverService.approveJoinRequest(pendingRequest['id'], false);
       hasPendingRequest.value = false;
       pendingRequest.clear();
-      
       requestState.value = RequestState.online;
+      if (declined) {
+        Get.snackbar(
+          'Request Declined',
+          'You have declined the join request',
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+        );
+      } else {
+        Get.snackbar(
+          'Error',
+          'Failed to decline request',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
     } catch (e) {
       requestState.value = RequestState.failed;
       Get.snackbar(
-        'Error', 
-        'Failed to decline request: ${e.toString()}',
+        'Error',
+        'Failed to decline request: [31m${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> pickupPassenger(String requestId) async {
+    try {
+      requestState.value = RequestState.loading;
+      final pickedUp = await _driverService.pickupPassenger(requestId);
+      if (pickedUp) {
+        // Update passenger status
+        final idx = passengers.indexWhere((p) => p['id'] == requestId);
+        if (idx != -1) passengers[idx]['pickedUp'] = true;
+        requestState.value = RequestState.online;
+        update();
+        Get.snackbar(
+          'Passenger Picked Up',
+          'You have picked up the passenger',
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+        );
+      } else {
+        requestState.value = RequestState.failed;
+        Get.snackbar(
+          'Error',
+          'Failed to pick up passenger',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      requestState.value = RequestState.failed;
+      Get.snackbar(
+        'Error',
+        'Failed to pick up passenger: [31m${e.toString()}',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  Future<void> dropoffPassenger(String requestId) async {
+    try {
+      requestState.value = RequestState.loading;
+      final dropped = await _driverService.dropoffPassenger(requestId);
+      if (dropped) {
+        // Update passenger status
+        final idx = passengers.indexWhere((p) => p['id'] == requestId);
+        if (idx != -1) passengers[idx]['droppedOff'] = true;
+        requestState.value = RequestState.online;
+        update();
+        Get.snackbar(
+          'Passenger Dropped Off',
+          'You have dropped off the passenger',
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+        );
+      } else {
+        requestState.value = RequestState.failed;
+        Get.snackbar(
+          'Error',
+          'Failed to drop off passenger',
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      requestState.value = RequestState.failed;
+      Get.snackbar(
+        'Error',
+        'Failed to drop off passenger: [31m${e.toString()}',
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
@@ -1520,6 +1633,59 @@ class DriverActiveRideController extends GetxController {
   }
 
   double _toRad(double deg) => deg * math.pi / 180;
+}
+
+class ChatController extends GetxController {
+  RxList<ChatMessage> messages = <ChatMessage>[].obs;
+  RxBool loading = false.obs;
+  String rideId;
+
+  ChatController(this.rideId);
+
+  Future<void> loadMessages() async {
+    loading.value = true;
+    try {
+      final token = Get.find<AuthController>().token.value;
+      messages.value = await ChatService.fetchMessages(token, rideId);
+    } catch (e) {
+      // Handle error
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  Future<void> sendMessage(String message) async {
+    final token = Get.find<AuthController>().token.value;
+    // Check if there are any passengers before sending a message
+    try {
+      final driverActiveRideController = Get.find<DriverActiveRideController>();
+      if (driverActiveRideController.passengers.isEmpty) {
+        Get.snackbar('Error', 'No passengers to send chat to', backgroundColor: Colors.red, colorText: Colors.white);
+        return;
+      }
+    } catch (_) {
+      // If controller not found, fallback to error
+      Get.snackbar('Error', 'No passengers to send chat to', backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+    try {
+      await ChatService.sendMessage(token, rideId, message);
+    } catch (e) {
+      // If chat room not found, create it and retry
+      if (e.toString().contains('Chat room not found')) {
+        await ChatService.createChatRoom(token, rideId);
+        await ChatService.sendMessage(token, rideId, message);
+      } else {
+        rethrow;
+      }
+    }
+    await loadMessages();
+  }
+
+  Future<void> createChatRoom() async {
+    final token = Get.find<AuthController>().token.value;
+    await ChatService.createChatRoom(token, rideId);
+  }
 }
 
 
