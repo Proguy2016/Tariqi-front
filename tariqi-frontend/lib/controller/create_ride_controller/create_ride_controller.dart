@@ -52,6 +52,9 @@ class CreateRideController extends GetxController {
         final lat = geometry.latitude;
         final lng = geometry.longitude;
 
+        dropLat = lat;
+        dropLong = lng;
+
         if (markers.length < 2) {
           markers.add(
             Marker(
