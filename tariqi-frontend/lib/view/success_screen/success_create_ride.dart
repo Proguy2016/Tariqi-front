@@ -47,12 +47,12 @@ class SuccessCreateRide extends StatelessWidget {
                             maxVal: 350,
                           );
                         },
-                        prifixtext: "From",
-                        label: controller.pickPoint,
+                        fieldIcon: Icon(Icons.location_on),
+                        label: controller.pickPoint.value,
                         enabled: false,
                         submitFunction: (value) {},
                         textEditingController: TextEditingController(),
-                        hint: controller.pickPoint,
+                        hint: controller.pickPoint.value,
                       ),
 
                       rideFormField(
@@ -65,12 +65,12 @@ class SuccessCreateRide extends StatelessWidget {
                             maxVal: 350,
                           );
                         },
-                        prifixtext: "To",
-                        label: controller.targetPoint,
+                        fieldIcon: Icon(Icons.location_on),
+                        label: controller.targetPoint.value,
                         enabled: false,
                         submitFunction: (value) {},
                         textEditingController: TextEditingController(),
-                        hint: controller.targetPoint,
+                        hint: controller.targetPoint.value,
                       ),
                     ],
                   ),

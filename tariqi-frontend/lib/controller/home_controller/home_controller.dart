@@ -1,23 +1,29 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:get/get.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:tariqi/const/api_links_keys/api_links_keys.dart';
-import 'package:http/http.dart' as http;
 import 'package:tariqi/const/class/request_state.dart';
 import 'package:tariqi/const/colors/app_colors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:tariqi/const/routes/routes_names.dart';
+import 'package:tariqi/main.dart';
+import 'package:tariqi/client_repo/client_info_repo.dart';
+import 'package:tariqi/client_repo/location_repo.dart';
+import 'package:tariqi/models/client_info_model.dart';
 
 class HomeController extends GetxController {
+  GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
+  ClientInfoRepo clientInfoRepo = ClientInfoRepo(dioClient: Get.find());
+  ClientLocationCordinatesRepo clientLocationRepo =
+      ClientLocationCordinatesRepo(dioClient: Get.find());
+  ClientLocationNameRepo clientLocationNameRepo = ClientLocationNameRepo(
+    dioClient: Get.find(),
+  );
+
   late MapController mapController;
   late TextEditingController pickPointController;
-  var isLoading = false.obs;
   Rx<RequestState> requestState = RequestState.none.obs;
-   RxBool selectedPackage = false.obs;
   RxBool isLocationDisabled = true.obs;
   Position userPosition = Position(
     longitude: 31.231865086027796,
@@ -31,102 +37,48 @@ class HomeController extends GetxController {
     speed: 0.0,
     speedAccuracy: 0.0,
   );
-  List<Marker> markers = [];
+  RxList<Marker> markers = RxList<Marker>([]);
+
+  List<ClientInfoModel> clientInfo = [];
 
   RxBool selectedRide = true.obs;
 
-  Future<LatLng?> getLocation({required String location}) async {
-    final geoCodeKey = ApiLinksKeys.geoCodingKey;
-    final url = Uri.parse(
-      '${ApiLinksKeys.baseUrl}?q=$location&key=$geoCodeKey',
+  Future<LatLng?> getClientLocation({required String location}) async {
+    var response = await clientLocationRepo.getClientLocationCordinates(
+      location: location,
     );
-    try {
-      requestState.value = RequestState.loading;
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final results = data['results'];
-        if (results.isNotEmpty) {
-          final geometry = results[0]['geometry'];
-          final lat = geometry['lat'];
-          final lng = geometry['lng'];
-          markers.add(
-            Marker(
-              point: LatLng(lat, lng),
-              child: Icon(
-                Icons.location_on,
-                color: AppColors.blueColor,
-                size: 30,
-              ),
-            ),
-          );
-          mapController.move(LatLng(lat, lng), 12);
-          requestState.value = RequestState.success;
+    if (response != null) {
+      markers.add(
+        Marker(
+          point: LatLng(response.latitude, response.longitude),
+          child: Icon(Icons.location_on, color: AppColors.blueColor, size: 30),
+        ),
+      );
+      mapController.move(LatLng(response.latitude, response.longitude), 12);
+      requestState.value = RequestState.success;
 
-          return LatLng(lat, lng);
-        } else {
-          requestState.value = RequestState.failed;
-        }
-      } else {
-        requestState.value = RequestState.failed;
-      }
-    } on SocketException catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Network error: $e');
-    } on TimeoutException catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Request timeout: $e');
-    } on HandshakeException catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Handshake error: $e');
-    } on Exception catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Failed to get location: $e');
+      return LatLng(response.latitude, response.longitude);
+    } else {
+      Get.snackbar("Failed", "Error Ocured While Proccessing Your Location");
     }
     return null;
   }
 
-  Future<String> getLocationName({
-    required double lat,
-    required double long,
-  }) async {
-    final geoCodeKey = ApiLinksKeys.geoCodingKey;
-    final url = Uri.parse(
-      '${ApiLinksKeys.baseUrl}?q=$lat+$long&key=$geoCodeKey&pretty=1',
+  Future getLocationName({required double lat, required double long}) async {
+    requestState.value = RequestState.loading;
+    var response = await clientLocationNameRepo.getClientLocationName(
+      lat: lat,
+      long: long,
     );
-    String locationName = "";
-    try {
-      requestState.value = RequestState.loading;
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final results = data['results'];
-        if (results.isNotEmpty) {
-          final locationName = results[0]['formatted'];
 
-          requestState.value = RequestState.success;
-
-          return locationName;
-        } else {
-          requestState.value = RequestState.failed;
-        }
-      } else {
-        requestState.value = RequestState.failed;
-      }
-    } on SocketException catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Network error: $e');
-    } on TimeoutException catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Request timeout: $e');
-    } on HandshakeException catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Handshake error: $e');
-    } on Exception catch (e) {
-      requestState.value = RequestState.error;
-      throw Exception('Failed to get location: $e');
+    if (response != null) {
+      pickPointController.text = response;
+      requestState.value = RequestState.success;
+    } else {
+      Get.snackbar("Failed", "Error Ocured While Proccessing Your Location");
+      requestState.value = RequestState.none;
     }
-    return locationName;
+    return response;
   }
 
   Future<Position> determinePosition() async {
@@ -161,21 +113,17 @@ class HomeController extends GetxController {
     try {
       requestState.value = RequestState.loading;
       userPosition = await determinePosition();
-      requestState.value = RequestState.success;
 
-      pickPointController.text = await getLocationName(
+      await getLocationName(
         lat: userPosition.latitude,
         long: userPosition.longitude,
       );
 
-      markers.add(
-        Marker(
-          point: LatLng(userPosition.latitude, userPosition.longitude),
-          child: Icon(Icons.location_on, color: AppColors.blueColor, size: 30),
-        ),
+      assignMarkers(
+        point: LatLng(userPosition.latitude, userPosition.longitude),
       );
 
-      
+      requestState.value = RequestState.success;
     } catch (e) {
       return Future.error('Failed to get user location: $e');
     }
@@ -199,17 +147,25 @@ class HomeController extends GetxController {
   }
 
   void assignMarkers({required LatLng point}) async {
-    pickPointController.text = await getLocationName(
-      lat: point.latitude,
-      long: point.longitude,
-    );
+    requestState.value = RequestState.loading;
+    await getLocationName(lat: point.latitude, long: point.longitude);
     mapController.move(LatLng(point.latitude, point.longitude), 15);
-    markers = [
-      Marker(
-        point: LatLng(point.latitude, point.longitude),
-        child: Icon(Icons.location_on, color: AppColors.blueColor, size: 30),
-      ),
-    ];
+
+    if (markers.isNotEmpty) {
+      markers.replaceRange(0, markers.length, [
+        Marker(
+          point: LatLng(point.latitude, point.longitude),
+          child: Icon(Icons.location_on, color: AppColors.blueColor, size: 30),
+        ),
+      ]);
+    } else {
+      markers.add(
+        Marker(
+          point: LatLng(point.latitude, point.longitude),
+          child: Icon(Icons.location_on, color: AppColors.blueColor, size: 30),
+        ),
+      );
+    }
 
     userPosition = Position(
       longitude: point.longitude,
@@ -224,7 +180,9 @@ class HomeController extends GetxController {
       speedAccuracy: 0.0,
     );
 
-    update();
+    markers.refresh();
+
+    requestState.value = RequestState.success;
   }
 
   void goToCreateRideScreen() {
@@ -238,9 +196,59 @@ class HomeController extends GetxController {
     );
   }
 
+  Future getUserData() async {
+    requestState.value = RequestState.loading;
+
+    try {
+      var response = await clientInfoRepo.loadProfile();
+
+      if (response is RequestState) {
+        requestState.value = response;
+      } else if (response is Map) {
+        List data = [];
+
+        data.add(response['user']);
+
+        clientInfo = data.map((e) => ClientInfoModel.fromJson(e)).toList();
+
+        requestState.value = RequestState.success;
+      }
+    } catch (e) {
+      requestState.value = RequestState.error;
+    }
+  }
+
+  void drawerNavigationFunc({required String title}) {
+    switch (title) {
+      case "trips":
+        Get.offNamed(AppRoutesNames.userTripsScreen);
+        break;
+
+      case "payment":
+        // handle payment
+        debugPrint("Payment");
+        break;
+
+      case "logout":
+        // handle logout
+        sharedPreferences.clear();
+        Get.offNamed(AppRoutesNames.loginScreen);
+        break;
+
+      case "notifications":
+        Get.offNamed(AppRoutesNames.notificationScreen);
+        break;
+
+      default:
+        break;
+    }
+  }
+
   void initControllers() {
     mapController = MapController();
-    pickPointController = TextEditingController();
+    pickPointController = TextEditingController(
+      text: "Please Wait To Get Your Location",
+    );
   }
 
   void disposeController() {
@@ -252,6 +260,7 @@ class HomeController extends GetxController {
   void onInit() {
     initControllers();
     checkLocationPremission();
+    getUserData();
     super.onInit();
   }
 

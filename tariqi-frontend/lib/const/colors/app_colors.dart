@@ -11,4 +11,6 @@ abstract class AppColors {
   static Color redColor = Color(0xffE13636);
   static Color otpBorder = Color(0xffCBC8C8);
   static Color lightBalckColor = Color(0xff2B2B2B);
+   static Color greyColor = Color(0xff2B2B2B);
+  static Color greenColor = Color.fromARGB(255, 35, 148, 42);
 }

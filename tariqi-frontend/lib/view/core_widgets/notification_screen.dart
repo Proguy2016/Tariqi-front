@@ -5,8 +5,8 @@ import 'package:tariqi/models/app_notification.dart';
 import 'package:tariqi/services/driver_service.dart';
 import 'package:tariqi/controller/driver/driver_active_ride_controller.dart';
 
-class NotificationScreen extends StatelessWidget {
-  const NotificationScreen({super.key});
+class NotificationScreens extends StatelessWidget {
+  const NotificationScreens({super.key});
 
   @override
   Widget build(BuildContext context) {

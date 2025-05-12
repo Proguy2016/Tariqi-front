@@ -3,7 +3,6 @@ import 'package:lottie/lottie.dart';
 import 'package:tariqi/const/class/request_state.dart';
 import 'package:tariqi/const/images/app_images.dart';
 
-
 class HandlingView extends StatelessWidget {
   final RequestState requestState;
   final Widget widget;

@@ -2,6 +2,7 @@ import 'package:get/get_navigation/src/routes/get_route.dart';
 import 'package:tariqi/const/routes/routes_names.dart';
 import 'package:tariqi/view/auth_screens/login_screen.dart';
 import 'package:tariqi/view/auth_screens/signup_screen.dart';
+import 'package:tariqi/view/available_rides_screen/available_rides.dart';
 import 'package:tariqi/view/create_ride_screen/create_ride_screen.dart';
 import 'package:tariqi/view/home_screen/home_screen.dart';
 import 'package:tariqi/view/intro_screens/splash_screen.dart';
@@ -11,6 +12,12 @@ import 'package:tariqi/view/driver/driver_active_ride_screen.dart';
 import 'package:tariqi/view/driver/driver_home_screen.dart';
 import 'package:tariqi/view/core_widgets/notification_screen.dart';
 import 'package:tariqi/view/core_widgets/chat_screen.dart';
+import 'package:tariqi/view/intro_screens/splash_screen.dart';
+import 'package:tariqi/view/success_screen/success_create_ride.dart';
+import 'package:tariqi/view/notification_screen/notification_screen.dart';
+import 'package:tariqi/view/track_ride_screen/track_ride_screen.dart';
+import 'package:tariqi/view/payment_screen/payment_screen.dart';
+import 'package:tariqi/view/trips_screen/user_trips_screen.dart';
 /// This file defines the application's route configuration using the GetX package.
 ///
 /// It imports necessary screens and middleware, and sets up a list of `GetPage`
@@ -45,10 +52,19 @@ GetPage(
 ),
 GetPage(
   name: '/notifications',
-  page: () => const NotificationScreen(),
+  page: () => const NotificationScreens(), 
 ),
 GetPage(
   name: '/chat',
   page: () => const ChatScreen(),
 ),
+  GetPage(
+    name: AppRoutesNames.availableRides,
+    page: () => AvailableRidesScreen(),
+  ),
+  GetPage(name: AppRoutesNames.userTripsScreen, page: () => UserTripsScreen()),
+  GetPage(name: AppRoutesNames.paymentScreen, page: () => PaymentScreen()),
+  GetPage(name: AppRoutesNames.chatScreen, page: () => ChatScreen()),
+  GetPage(name: AppRoutesNames.notificationScreen, page: () => NotificationScreen()),
+  GetPage(name: AppRoutesNames.trackRequestScreen, page: () => TrackRideScreen()),
 ];
