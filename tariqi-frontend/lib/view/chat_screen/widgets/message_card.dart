@@ -5,6 +5,9 @@ import 'package:tariqi/const/functions/time_format.dart';
 import 'package:tariqi/models/messages_model.dart';
 
 Widget buildMessageCard({required MessagesModel message}) {
+  final String senderName = (message.sender != null && message.sender!.isNotEmpty)
+      ? message.sender!
+      : (message.senderType ?? 'Unknown');
   return Align(
     alignment:
         message.senderType == "client"
@@ -42,7 +45,23 @@ Widget buildMessageCard({required MessagesModel message}) {
         ),
       ),
       child: Column(
+        crossAxisAlignment: message.senderType == "client"
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.end,
         children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2.0),
+            child: Text(
+              senderName,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: message.senderType == "client"
+                    ? AppColors.blueColor
+                    : AppColors.whiteColor,
+              ),
+            ),
+          ),
           Container(
             alignment:
                 message.senderType == "client"
@@ -51,7 +70,6 @@ Widget buildMessageCard({required MessagesModel message}) {
             child: Text(
               message.content!,
               overflow: TextOverflow.clip,
-             
               style: TextStyle(
                 fontSize: 16,
                 color:
@@ -61,7 +79,6 @@ Widget buildMessageCard({required MessagesModel message}) {
               ),
             ),
           ),
-
           Container(
             alignment:
                 message.senderType == "client"

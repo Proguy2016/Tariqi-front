@@ -13,7 +13,8 @@ class ChatScreen extends StatelessWidget {
       final profile = await driverService.getDriverProfile();
       final firstName = profile['firstName'] ?? '';
       final lastName = profile['lastName'] ?? '';
-      return (firstName + ' ' + lastName).trim().isEmpty ? 'Driver' : (firstName + ' ' + lastName).trim();
+      final fullName = (firstName + ' ' + lastName).trim();
+      return fullName.isEmpty ? 'Driver' : fullName;
     } catch (_) {
       return 'Driver';
     }
@@ -54,18 +55,21 @@ class ChatScreen extends StatelessWidget {
                     itemCount: controller.messages.length,
                     itemBuilder: (context, index) {
                       final ChatMessage msg = controller.messages[controller.messages.length - 1 - index];
-                      final isMe = msg.senderName == driverName || msg.senderName == 'Driver';
+                      
+                      // Always use the real driver name for driver messages
+                      final displayName = msg.isDriver ? driverName : msg.senderName;
+                      
                       return Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        alignment: msg.isDriver ? Alignment.centerRight : Alignment.centerLeft,
                         child: Column(
-                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                          crossAxisAlignment: msg.isDriver ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                           children: [
                             Padding(
                               padding: const EdgeInsets.only(left: 4, right: 4, bottom: 2),
                               child: Text(
-                                isMe ? driverName : msg.senderName,
+                                displayName,
                                 style: TextStyle(
-                                  color: isMe ? Colors.blue[200] : Colors.grey[700],
+                                  color: msg.isDriver ? Colors.blue[200] : Colors.grey[400],
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
                                 ),
@@ -75,21 +79,21 @@ class ChatScreen extends StatelessWidget {
                               margin: const EdgeInsets.symmetric(vertical: 2),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                               decoration: BoxDecoration(
-                                color: isMe ? Colors.blue : Colors.white,
+                                color: msg.isDriver ? Colors.blue : Colors.white,
                                 borderRadius: BorderRadius.only(
                                   topLeft: const Radius.circular(18),
                                   topRight: const Radius.circular(18),
-                                  bottomLeft: Radius.circular(isMe ? 18 : 0),
-                                  bottomRight: Radius.circular(isMe ? 0 : 18),
+                                  bottomLeft: Radius.circular(msg.isDriver ? 18 : 0),
+                                  bottomRight: Radius.circular(msg.isDriver ? 0 : 18),
                                 ),
                               ),
                               child: Column(
-                                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                crossAxisAlignment: msg.isDriver ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     msg.message,
                                     style: TextStyle(
-                                      color: isMe ? Colors.white : Colors.black,
+                                      color: msg.isDriver ? Colors.white : Colors.black,
                                       fontSize: 16,
                                     ),
                                   ),
@@ -97,7 +101,7 @@ class ChatScreen extends StatelessWidget {
                                   Text(
                                     _formatTime(msg.createdAt),
                                     style: TextStyle(
-                                      color: isMe ? Colors.white70 : Colors.black54,
+                                      color: msg.isDriver ? Colors.white70 : Colors.black54,
                                       fontSize: 10,
                                     ),
                                   ),

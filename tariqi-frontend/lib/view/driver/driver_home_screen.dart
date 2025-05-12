@@ -12,6 +12,8 @@ import 'package:tariqi/const/class/request_state.dart';
 import 'package:tariqi/const/routes/routes_names.dart';
 import 'package:tariqi/services/driver_service.dart';
 import 'dart:developer';
+import 'package:tariqi/controller/notification_controller.dart';
+import 'package:tariqi/models/app_notification.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -118,6 +120,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
   Widget build(BuildContext context) {
     ScreenSize.init(context);
     
+    // Initialize services and controllers immediately
+    controller = Get.put(DriverHomeController());
+    final notificationController = Get.put(NotificationController());
+    if (notificationController.notifications.isEmpty) {
+      notificationController.loadNotifications();
+    }
+    
     return Scaffold(
       body: AnimatedBuilder(
         animation: _sideMenuController,
@@ -181,49 +190,243 @@ class _DriverHomeScreenState extends State<DriverHomeScreen>
                 child: Container(
                   width: ScreenSize.screenWidth! * 0.7,
                   height: double.infinity,
+                  decoration: BoxDecoration(
                   color: AppColors.blackColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(32),
+                      bottom: Radius.circular(32),
+                    ),
+                  ),
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(24.0),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 24),
                           const Text(
                             "Driver Menu",
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 24,
+                              fontSize: 26,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
                             ),
                           ),
-                          const Divider(color: Colors.white),
-                          _buildDriverInfo(controller),
-                          const Divider(color: Colors.white),
-                          // Active Ride Button
+                          const SizedBox(height: 18),
+                          // Profile Card
+                          Card(
+                            color: Colors.white.withOpacity(0.06),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                              child: Obx(() => Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  CircleAvatar(
+                                    radius: 38,
+                                    backgroundColor: Colors.grey[700],
+                                    backgroundImage: controller.driverProfilePic.value.isNotEmpty
+                                        ? NetworkImage(controller.driverProfilePic.value)
+                                        : null,
+                                    child: controller.driverProfilePic.value.isEmpty
+                                        ? const Icon(Icons.person, size: 38, color: Colors.white)
+                                        : null,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    controller.driverEmail.value,
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '${controller.carMake.value} ${controller.carModel.value}',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  Text(
+                                    'License: ${controller.licensePlate.value}',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              )),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Divider(color: Colors.white.withOpacity(0.15), thickness: 1),
+                          // Menu Items
+                          const SizedBox(height: 10),
                           Obx(() => controller.hasActiveRide.value
                             ? ListTile(
                                 leading: const Icon(Icons.directions_car, color: Colors.green),
                                 title: const Text("Resume Active Ride", style: TextStyle(color: Colors.white)),
                                 onTap: () {
-                                  // Close menu first
                                   _sideMenuController.reverse();
-                                  // Navigate to active ride
                                   controller.goToActiveRide();
                                 },
+                                contentPadding: EdgeInsets.zero,
+                                horizontalTitleGap: 12,
                               )
                             : const SizedBox.shrink()
                           ),
                           ListTile(
-                            leading: const Icon(Icons.settings, color: Colors.white),
-                            title: const Text("Settings", style: TextStyle(color: Colors.white)),
-                            onTap: () {},
+                            leading: const Icon(Icons.account_circle, color: Colors.white),
+                            title: const Text("View Profile", style: TextStyle(color: Colors.white)),
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Driver Profile'),
+                                  content: Obx(() => Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Center(
+                                        child: CircleAvatar(
+                                          radius: 40,
+                                          backgroundImage: controller.driverProfilePic.value.isNotEmpty
+                                              ? NetworkImage(controller.driverProfilePic.value)
+                                              : null,
+                                          child: controller.driverProfilePic.value.isEmpty
+                                              ? const Icon(Icons.person, size: 40)
+                                              : null,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text('Email: ${controller.driverEmail.value}'),
+                                      const SizedBox(height: 8),
+                                      Text('Car: ${controller.carMake.value} ${controller.carModel.value}'),
+                                      Text('License Plate: ${controller.licensePlate.value}'),
+                                      const SizedBox(height: 8),
+                                      Text('Driving License: ${controller.drivingLicense.value}'),
+                                    ],
+                                  )),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      child: const Text('Close'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            contentPadding: EdgeInsets.zero,
+                            horizontalTitleGap: 12,
                           ),
+                          // Notifications ListTile with badge
+                          Obx(() {
+                            final unreadCount = notificationController.notifications.where((n) => !n.read).length;
+                            return Stack(
+                              children: [
+                                ListTile(
+                                  leading: const Icon(Icons.notifications, color: Colors.white),
+                                  title: const Text("Notifications", style: TextStyle(color: Colors.white)),
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Notifications'),
+                                        content: SizedBox(
+                                          width: 320,
+                                          child: Obx(() {
+                                            final notifications = notificationController.notifications;
+                                            if (notifications.isEmpty) {
+                                              return const Text('No notifications.');
+                                            }
+                                            return ListView.separated(
+                                              shrinkWrap: true,
+                                              itemCount: notifications.length,
+                                              separatorBuilder: (c, i) => const Divider(),
+                                              itemBuilder: (c, i) {
+                                                final n = notifications[i];
+                                                return ListTile(
+                                                  leading: Icon(
+                                                    n.read ? Icons.notifications_none : Icons.notifications_active,
+                                                    color: n.read ? Colors.grey : Colors.blue,
+                                                  ),
+                                                  title: Text(n.title, style: TextStyle(fontWeight: n.read ? FontWeight.normal : FontWeight.bold)),
+                                                  subtitle: Text(n.message),
+                                                  trailing: n.read ? null : const Icon(Icons.circle, color: Colors.red, size: 10),
+                                                  onTap: () {
+                                                    // Mark as read in-place
+                                                    notificationController.notifications[i] = AppNotification(
+                                                      id: n.id,
+                                                      type: n.type,
+                                                      title: n.title,
+                                                      message: n.message,
+                                                      recipientId: n.recipientId,
+                                                      createdAt: n.createdAt,
+                                                      read: true,
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                            );
+                                          }),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(context).pop(),
+                                            child: const Text('Close'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    _sideMenuController.reverse(); // Close the menu when dialog opens
+                                  },
+                                  contentPadding: EdgeInsets.zero,
+                                  horizontalTitleGap: 12,
+                                ),
+                                if (unreadCount > 0)
+                                  Positioned(
+                                    left: 18,
+                                    top: 10,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 16,
+                                        minHeight: 16,
+                                      ),
+                                      child: Text(
+                                        '$unreadCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          }),
                           ListTile(
                             leading: const Icon(Icons.logout, color: Colors.white),
                             title: const Text("Logout", style: TextStyle(color: Colors.white)),
                             onTap: () => controller.logout(),
+                            contentPadding: EdgeInsets.zero,
+                            horizontalTitleGap: 12,
                           ),
+                          const Spacer(),
+                          Divider(color: Colors.white.withOpacity(0.10), thickness: 1),
+                          const SizedBox(height: 10),
+                          Center(
+                            child: Text(
+                              'Tariqi Driver v1.0',
+                              style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 1.1),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                         ],
                       ),
                     ),

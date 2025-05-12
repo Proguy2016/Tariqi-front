@@ -8,7 +8,7 @@ class AuthController extends GetxController {
   RxBool isLoggedIn = false.obs;
 
   Future<void> saveToken(String newToken) async {
-    log("📝 Saving new token: "+newToken.substring(0, math.min(10, newToken.length))+"...");
+    log("📝 Saving new token: ${newToken.substring(0, math.min(10, newToken.length))}...");
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('authToken', newToken);
     token.value = newToken;
@@ -27,7 +27,7 @@ class AuthController extends GetxController {
       log("⚠️ No token found in storage");
     } else {
       // Log full token for debugging - REMOVE IN PRODUCTION
-      log("🔑 FULL TOKEN: "+token.value);
+      log("🔑 FULL TOKEN: ${token.value}");
     }
   }
 

@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:tariqi/const/api_data/api_links.dart';
-import 'package:tariqi/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class DioClient {
   static final DioClient _instance = DioClient._internal();
   factory DioClient() => _instance;
-  final authToken = sharedPreferences.getString("token");
 
   late Dio dio;
 
@@ -16,14 +15,23 @@ class DioClient {
         connectTimeout: const Duration(seconds: 130),
         receiveTimeout: const Duration(seconds: 130),
         validateStatus: (status) => status != null && status < 500,
-        headers: {
-          // 'Content-Type': 'application/json',
-          'Authorization': 'Bearer $authToken',
-        },
       ),
     );
 
-    // اختياري: إضافة Interceptors لعرض اللوج أو التعامل مع الأخطاء
+    // Add an interceptor to always set the latest token
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('authToken') ?? '';
+        if (token.isNotEmpty) {
+          options.headers['Authorization'] = 'Bearer $token';
+        } else {
+          options.headers.remove('Authorization');
+        }
+        return handler.next(options);
+      },
+    ));
+
     dio.interceptors.add(
       LogInterceptor(
         request: true,

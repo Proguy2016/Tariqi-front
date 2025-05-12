@@ -13,6 +13,12 @@ class ApiEndpoints {
   static const String driverEndClientRide = '$baseUrl/driver/end/client/ride'; // Append ride_id and client_id when calling
   static const String driverAcceptRequest = '$baseUrl/driver/accept-request';
   static const String driverDeclineRequest = '$baseUrl/driver/decline-request';
+  
+  // Join request endpoints
+  static const String joinRequestsPending = '$baseUrl/joinRequests/pending'; // Append ride_id when calling
+  static const String joinRequestApprove = '$baseUrl/joinRequests'; // Append /{request_id}/approve when calling
+  static const String joinRequestPickup = '$baseUrl/joinRequests'; // Append /{request_id}/pickup when calling
+  static const String joinRequestDropoff = '$baseUrl/joinRequests'; // Append /{request_id}/dropoff when calling
 
   // User endpoints
   static const String userGetPendingRequests = '$baseUrl/user/get/pending/requests'; // Append ride_id when calling

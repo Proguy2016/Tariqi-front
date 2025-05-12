@@ -11,6 +11,8 @@ import 'package:tariqi/services/driver_service.dart';
 import 'package:tariqi/const/class/request_state.dart';
 import 'dart:developer';
 import 'package:geolocator/geolocator.dart';
+import 'package:tariqi/controller/notification_controller.dart';
+import 'package:tariqi/models/app_notification.dart';
 
 // Import the global routes variable
 import 'package:tariqi/controller/driver/driver_active_ride_controller.dart' show routes;
@@ -25,6 +27,7 @@ class DriverActiveRideScreen extends StatelessWidget {
     // Initialize services and controllers immediately
     final driverService = Get.put(DriverService(), permanent: true);
     final controller = Get.put(DriverActiveRideController());
+    final notificationController = Get.put(NotificationController());
     
     // Process navigation arguments
     final Map<String, dynamic> args = Get.arguments ?? {};
@@ -60,6 +63,10 @@ class DriverActiveRideScreen extends StatelessWidget {
     // Listen for ride requests
     _setupRideRequestListener(controller);
 
+    if (notificationController.notifications.isEmpty) {
+      notificationController.loadNotifications();
+    }
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -79,11 +86,95 @@ class DriverActiveRideScreen extends StatelessWidget {
             onPressed: () => Get.toNamed('/chat', arguments: {'rideId': controller.rideId}),
             tooltip: "Chat",
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications, color: Colors.white),
-            onPressed: () => Get.toNamed('/notifications'),
-            tooltip: "Notifications",
-          ),
+          // Notification icon with badge
+          Obx(() {
+            final unreadCount = notificationController.notifications.where((n) => !n.read).length;
+            return Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications, color: Colors.white),
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Notifications'),
+                        content: SizedBox(
+                          width: 320,
+                          child: Obx(() {
+                            final notifications = notificationController.notifications;
+                            if (notifications.isEmpty) {
+                              return const Text('No notifications.');
+                            }
+                            return ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: notifications.length,
+                              separatorBuilder: (c, i) => const Divider(),
+                              itemBuilder: (c, i) {
+                                final n = notifications[i];
+                                return ListTile(
+                                  leading: Icon(
+                                    n.read ? Icons.notifications_none : Icons.notifications_active,
+                                    color: n.read ? Colors.grey : Colors.blue,
+                                  ),
+                                  title: Text(n.title, style: TextStyle(fontWeight: n.read ? FontWeight.normal : FontWeight.bold)),
+                                  subtitle: Text(n.message),
+                                  trailing: n.read ? null : const Icon(Icons.circle, color: Colors.red, size: 10),
+                                  onTap: () {
+                                    // Mark as read in-place
+                                    notificationController.notifications[i] = AppNotification(
+                                      id: n.id,
+                                      type: n.type,
+                                      title: n.title,
+                                      message: n.message,
+                                      recipientId: n.recipientId,
+                                      createdAt: n.createdAt,
+                                      read: true,
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          }),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  tooltip: "Notifications",
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          }),
           IconButton(
             icon: const Icon(Icons.stop_circle_outlined, color: Colors.red),
             onPressed: () => _showEndRideDialog(controller),
@@ -157,12 +248,7 @@ class DriverActiveRideScreen extends StatelessWidget {
           child: Stack(
             children: [
               _buildMap(controller),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: _buildRideInfoSheet(controller),
-              ),
+              _buildBottomSheet(context, controller),
             ],
           ),
         );
@@ -300,216 +386,349 @@ class DriverActiveRideScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRideInfoSheet(DriverActiveRideController controller) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.blackColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            spreadRadius: 5,
+  Widget _buildBottomSheet(BuildContext context, DriverActiveRideController controller) {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.blackColor,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Drag indicator
-          Container(
-            margin: const EdgeInsets.only(top: 10),
-            width: 40,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.grey[600],
-              borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 10,
+              spreadRadius: 5,
             ),
-          ),
-          
-          // Ride stats cards row
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-            child: Row(
-              children: [
-                // Destination Card
-                Expanded(
-                  flex: 2,
-                  child: _buildInfoCard(
-                    title: "Destination",
-                    value: controller.destination,
-                    icon: Icons.location_on,
-                    iconColor: Colors.blue,
-                  ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag indicator
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                width: 40,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(width: 12),
-                // ETA card
-                Expanded(
-                  child: _buildInfoCard(
-                    title: "ETA",
-                    value: "${controller.etaMinutes} min",
-                    icon: Icons.timer,
-                    iconColor: Colors.amber,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Distance card
-                Expanded(
-                  child: _buildInfoCard(
-                    title: "Distance",
-                    value: "${controller.distanceKm.toStringAsFixed(1)} km",
-                    icon: Icons.straighten,
-                    iconColor: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Divider
-          Divider(color: Colors.grey[800], thickness: 1, height: 1),
-          
-          // Passengers section
-          Container(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ),
+              
+              // Ride stats cards row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+                child: Row(
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.people, color: Colors.blue, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Passengers",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                    // Destination Card
+                    Expanded(
+                      flex: 2,
+                      child: _buildInfoCard(
+                        title: "Destination",
+                        value: controller.destination,
+                        icon: Icons.location_on,
+                        iconColor: Colors.blue,
+                      ),
                     ),
-                    Obx(() => Text(
-                      "${controller.passengers.length} onboard",
-                      style: TextStyle(color: Colors.grey[400], fontSize: 14),
-                    )),
+                    const SizedBox(width: 12),
+                    // ETA card
+                    Expanded(
+                      child: _buildInfoCard(
+                        title: "ETA",
+                        value: "${controller.etaMinutes} min",
+                        icon: Icons.timer,
+                        iconColor: Colors.amber,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Distance card
+                    Expanded(
+                      child: _buildInfoCard(
+                        title: "Distance",
+                        value: "${controller.distanceKm.toStringAsFixed(1)} km",
+                        icon: Icons.straighten,
+                        iconColor: Colors.green,
+                      ),
+                    ),
                   ],
                 ),
-                
-                const SizedBox(height: 10),
-                
-                // Passenger list
-                Obx(() => controller.passengers.isEmpty
-                  ? Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      alignment: Alignment.center,
-                      child: Column(
-                        children: [
-                          Icon(Icons.airline_seat_recline_normal, size: 30, color: Colors.grey[700]),
-                          const SizedBox(height: 8),
-                          Text(
-                            "No passengers yet",
-                            style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+              ),
+              
+              // Divider
+              Divider(color: Colors.grey[800], thickness: 1, height: 1),
+              
+              // Passengers section
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.people, color: Colors.blue, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Passengers",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Obx(() => Text(
+                          "${controller.passengers.length} onboard",
+                          style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                        )),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 10),
+                    
+                    // Passenger list
+                    _buildPassengerList(context, controller),
+                    
+                    // End ride button
+                    Container(
+                      margin: const EdgeInsets.only(top: 16),
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showEndRideDialog(controller),
+                        icon: const Icon(Icons.stop_circle, color: Colors.white),
+                        label: const Text("END RIDE", style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "Passengers will appear here when they join your ride",
-                            style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                            textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  // Helper method to build the passenger list
+  Widget _buildPassengerList(BuildContext context, DriverActiveRideController controller) {
+    return Obx(() {
+      final passengers = controller.passengers;
+      
+      if (passengers.isEmpty) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          alignment: Alignment.center,
+          child: Column(
+            children: [
+              Icon(Icons.airline_seat_recline_normal, size: 30, color: Colors.grey[700]),
+              const SizedBox(height: 8),
+              Text(
+                "No passengers yet",
+                style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "Passengers will appear here when they join your ride",
+                style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        );
+      }
+      
+      return SizedBox(
+        height: MediaQuery.of(context).size.height * 0.3,
+        child: ListView.separated(
+          shrinkWrap: true,
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: passengers.length,
+          separatorBuilder: (context, index) => Divider(color: Colors.grey[800], height: 1),
+          itemBuilder: (context, index) {
+            final passenger = passengers[index];
+            
+            // Format pickup and dropoff locations for better display
+            final pickupLocation = passenger['pickup'] ?? 'Current location';
+            final dropoffLocation = passenger['dropoff'] ?? 'Ride destination';
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.grey[800],
+                    backgroundImage: _getProfileImage(passenger['profilePic']),
+                  ),
+                  title: Row(
+                    children: [
+                      Text(
+                        passenger['name'] ?? 'Passenger',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      if (passenger['price'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: Text(
+                            '(${passenger['price'].toString().contains("EGP") ? passenger['price'] : "EGP ${passenger['price'].toString().replaceAll(RegExp(r'[^\d.]'), '')}"})' ,
+                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                    ],
+                  ),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, size: 16, color: Colors.blue),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              "From: ${controller.pendingRequest.value['pickup'] ?? 'Current location'}",
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[800],
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: controller.passengers.length,
-                      separatorBuilder: (context, index) => Divider(color: Colors.grey[800], height: 1),
-                      itemBuilder: (context, index) {
-                        final passenger = controller.passengers[index];
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.grey[800],
-                            backgroundImage: _getProfileImage(passenger['profilePic']),
+                      Row(
+                        children: [
+                          Icon(Icons.arrow_circle_down, size: 14, color: Colors.blue),
+                          SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              "To: $dropoffLocation",
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                            ),
                           ),
-                          title: Text(
-                            passenger['name'] ?? 'Passenger',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          subtitle: Text(
-                            "Rating: ${passenger['rating'] ?? '0.0'}",
-                            style: const TextStyle(color: Colors.grey),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (!(passenger['pickedUp'] ?? false))
-                                ElevatedButton.icon(
-                                  onPressed: () => controller.pickupPassenger(passenger['id']),
-                                  icon: const Icon(Icons.person_pin_circle, size: 16),
-                                  label: const Text("Pick Up"),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue,
-                                    foregroundColor: Colors.white,
-                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    textStyle: TextStyle(fontSize: 12),
-                                  ),
-                                ),
-                              if ((passenger['pickedUp'] ?? false) && !(passenger['droppedOff'] ?? false))
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8.0),
-                                  child: ElevatedButton.icon(
-                                    onPressed: () => controller.dropoffPassenger(passenger['id']),
-                                    icon: const Icon(Icons.exit_to_app, size: 16),
-                                    label: const Text("Drop Off"),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange,
-                                      foregroundColor: Colors.white,
-                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      textStyle: TextStyle(fontSize: 12),
-                                    ),
-                                  ),
-                                ),
-                              if ((passenger['pickedUp'] ?? false) && (passenger['droppedOff'] ?? false))
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8.0),
-                                  child: Icon(Icons.check_circle, color: Colors.green, size: 20),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                ),
-                
-                // End ride button
-                Container(
-                  margin: const EdgeInsets.only(top: 16),
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showEndRideDialog(controller),
-                    icon: const Icon(Icons.stop_circle, color: Colors.white),
-                    label: const Text("END RIDE", style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        ],
                       ),
-                    ),
+                    ],
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!(passenger['pickedUp'] ?? false))
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => controller.pickupPassenger(passenger['id']),
+                              icon: const Icon(Icons.person_pin_circle, size: 16),
+                              label: const Text("Pick Up"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                textStyle: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                            SizedBox(height: 4),
+                            // Route to button for non-picked up passengers
+                            if (passenger['pickupLocation'] != null)
+                              ElevatedButton.icon(
+                                onPressed: () => _routeToPassenger(controller, passenger),
+                                icon: const Icon(Icons.directions, size: 16),
+                                label: const Text("Route to"),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  textStyle: TextStyle(fontSize: 12),
+                                ),
+                              ),
+                          ],
+                        ),
+                      if ((passenger['pickedUp'] ?? false) && !(passenger['droppedOff'] ?? false))
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: ElevatedButton.icon(
+                            onPressed: () => controller.dropoffPassenger(passenger['id']),
+                            icon: const Icon(Icons.exit_to_app, size: 16),
+                            label: const Text("Drop Off"),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              textStyle: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+                      if ((passenger['pickedUp'] ?? false) && (passenger['droppedOff'] ?? false))
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: Icon(Icons.check_circle, color: Colors.green, size: 20),
+                        ),
+                    ],
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
+            );
+          },
+        ),
+      );
+    });
+  }
+  
+  // Helper method to handle routing to a specific passenger
+  void _routeToPassenger(DriverActiveRideController controller, Map<String, dynamic> passenger) {
+    // Extract the passenger's pickup location
+    final pickupLocation = passenger['pickupLocation'];
+    
+    if (pickupLocation != null) {
+      // Create a marker for the passenger's pickup location if not already there
+      controller.addPassengerMarker(
+        pickupLocation,
+        profilePic: passenger['profilePic'],
+        passengerName: passenger['name'] ?? 'Passenger',
+      );
+      
+      // Draw the route to this passenger
+      controller.drawRouteToPassenger(pickupLocation);
+      
+      // Pan map to the passenger location
+      controller.mapController.move(pickupLocation, 15.0);
+      
+      // Notify the user
+      Get.snackbar(
+        'Routing to Passenger',
+        'Navigation updated to route to ${passenger['name'] ?? 'passenger'}',
+        backgroundColor: Colors.teal,
+        colorText: Colors.white,
+        duration: Duration(seconds: 2),
+      );
+    } else {
+      Get.snackbar(
+        'Cannot Route',
+        'No pickup location available for this passenger',
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
   
   // Helper method to build info cards
@@ -570,7 +789,8 @@ class DriverActiveRideScreen extends StatelessWidget {
   Widget _buildRideRequestDialog(DriverActiveRideController controller) {
     // Extract relevant data for the view
     final pickupTimeMinutes = controller.pendingRequest.value['pickupTimeMinutes'] ?? 3;
-    final estimatedEarnings = controller.pendingRequest.value['estimatedEarnings'] ?? 'SAR 15-20';
+    final price = controller.pendingRequest.value['price'] ?? 'SAR 0';
+    final dropoff = controller.pendingRequest.value['dropoff'];
     
     // Create a stateful builder to handle the countdown timer animation
     return StatefulBuilder(
@@ -658,44 +878,22 @@ class DriverActiveRideScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            controller.pendingRequest.value['name'] ?? 'Passenger',
+                            controller.pendingRequest.value['name'] ?? 'New Passenger',
                             style: TextStyle(
                               fontSize: 18, 
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
                             ),
                           ),
-                          SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Text(
-                                "Rating: ",
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                              ...List.generate(
-                                5, 
-                                (index) => Icon(
-                                  index < (controller.pendingRequest.value['rating'] ?? 5).floor() 
-                                      ? Icons.star 
-                                      : Icons.star_border,
-                                  color: Colors.amber,
-                                  size: 16,
-                                ),
-                              ),
-                            ],
-                          ),
                           SizedBox(height: 8),
                           // Pickup location with icon
                           Row(
                             children: [
-                              Icon(Icons.location_on, size: 16, color: Colors.red),
+                              Icon(Icons.location_on_outlined, size: 16, color: Colors.blue),
                               SizedBox(width: 4),
                               Expanded(
                                 child: Text(
-                                  controller.pendingRequest.value['pickup'] ?? 'Unknown Location',
+                                  "From: ${controller.pendingRequest.value['pickup'] ?? 'Current location'}",
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -706,6 +904,26 @@ class DriverActiveRideScreen extends StatelessWidget {
                               ),
                             ],
                           ),
+                          SizedBox(height: 4),
+                          // Dropoff location
+                          if (dropoff != null)
+                            Row(
+                              children: [
+                                Icon(Icons.location_on, size: 16, color: Colors.red),
+                                SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    "To: $dropoff",
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.grey[800],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                     ),
@@ -713,7 +931,7 @@ class DriverActiveRideScreen extends StatelessWidget {
                 ),
               ),
 
-              // Earning estimate
+              // Price container
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 decoration: BoxDecoration(
@@ -727,14 +945,14 @@ class DriverActiveRideScreen extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Estimated Earnings",
+                      "Ride Price",
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.grey[800],
                       ),
                     ),
                     Text(
-                      estimatedEarnings,
+                      price,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,

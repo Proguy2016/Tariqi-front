@@ -304,27 +304,42 @@ class DriverService extends GetConnect {
 
   Future<bool> endRide(String rideId) async {
     try {
+      log("📤 Attempting to end ride with ID: $rideId");
+      
       final authController = Get.find<AuthController>();
-      final response = await http.post(
-        Uri.parse("${ApiEndpoints.baseUrl}/driver/end/ride/$rideId"),
-        headers: {
-          'Authorization': 'Bearer ${authController.token.value}',
-          'Content-Type': 'application/json',
-        },
+      final token = authController.token.value;
+      
+      // Use the dedicated endpoint from ApiEndpoints
+      final url = "${ApiEndpoints.baseUrl}/driver/ride/$rideId/end";
+      log("📤 End ride URL: $url");
+      
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+      
+      final response = await http.put(
+        Uri.parse(url),
+        headers: headers,
       );
       
-      log("🛑 End ride response: ${response.statusCode}");
+      log("📥 End ride response: [${response.statusCode}]");
+      log("📥 Response body: ${response.body}");
       
-      if (response.statusCode == 200) {
-        // Clear current ride ID
-        currentRideId = null;
-        log("✅ Ride ended successfully");
-        return true;
+      if (response.statusCode != 200) {
+        log("❌ Failed to end ride. Status: ${response.statusCode}, Body: ${response.body}");
       }
       
-      return false;
+      // Clear the current ride ID if successful
+      if (response.statusCode == 200) {
+        currentRideId = null;
+        // Clear saved passengers for this ride
+        await clearSavedPassengers(rideId);
+      }
+      
+      return response.statusCode == 200;
     } catch (e) {
-      log("⚠️ Error ending ride: $e");
+      log("❌ Exception in endRide: $e");
       return false;
     }
   }
@@ -350,38 +365,100 @@ class DriverService extends GetConnect {
   }
 
   Future<List<dynamic>> getPendingRequests(String rideId) async {
-    try {
-      final authController = Get.find<AuthController>();
-      final response = await http.get(
-        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/pending/$rideId"),
-        headers: {
-          'Authorization': 'Bearer ${authController.token.value}',
+    int retryCount = 0;
+    const maxRetries = 2;
+    const initialDelayMs = 1000;
+    
+    Future<List<dynamic>> attemptRequest() async {
+      try {
+        final authController = Get.find<AuthController>();
+        final token = authController.token.value;
+        
+        // Log useful debugging information
+        final url = "${ApiEndpoints.joinRequestsPending}/$rideId";
+        log("📤 Fetching pending requests URL: $url");
+        
+        final headers = {
+          'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
-        },
-      );
-      log("🛑 Pending requests response status: ${response.statusCode}");
-      log("🛑 Pending requests response body: ${response.body}");
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        if (data is List) {
-          log("✅ Received list of pending requests: ${data.length} requests");
-          return data;
-        } else if (data is Map && data.containsKey('requests')) {
-          log("✅ Received map with requests field: ${data['requests']?.length ?? 0} requests");
-          return data['requests'] ?? [];
+        };
+        
+        final response = await http.get(
+          Uri.parse(url),
+          headers: headers,
+        );
+        
+        log("📥 Pending requests response status: ${response.statusCode}");
+        
+        // Only log full response for smaller responses to avoid console flooding
+        if (response.body.length < 1000) {
+          log("📥 Pending requests response body: ${response.body}");
         } else {
-          log("⚠️ Unexpected response format: $data");
+          log("📥 Pending requests response body too large to log (${response.body.length} bytes)");
+        }
+        
+        if (response.statusCode == 200) {
+          try {
+            final data = jsonDecode(response.body);
+            if (data is List) {
+              log("✅ Received list of pending requests: ${data.length} requests");
+              return data;
+            } else if (data is Map && data.containsKey('requests')) {
+              log("✅ Received map with requests field: ${data['requests']?.length ?? 0} requests");
+              return data['requests'] ?? [];
+            } else {
+              log("⚠️ Unexpected response format: $data");
+              return [];
+            }
+          } catch (e) {
+            log("⚠️ JSON parse error: $e");
+            return [];
+          }
+        } else if (response.statusCode == 502) {
+          // 502 Bad Gateway - server issue
+          throw Exception("Server temporarily unavailable (502). This is a server-side issue.");
+        } else if (response.statusCode >= 500) {
+          // Other 5xx server errors
+          throw Exception("Server error (${response.statusCode}). Please try again later.");
+        } else if (response.statusCode == 404) {
+          // 404 Not Found - no pending requests or wrong endpoint
+          log("ℹ️ No pending requests found (404): ${response.body}");
+          return [];
+        } else if (response.statusCode == 401) {
+          // 401 Unauthorized - auth issue
+          log("⚠️ Authentication error (401): ${response.body}");
+          return [];
+        } else {
+          // Any other status code
+          log("❌ Failed to get pending requests: ${response.statusCode} - ${response.body}");
           return [];
         }
-      } else {
-        log("❌ Failed to get pending requests: ${response.statusCode} - ${response.body}");
-        return [];
+      } catch (e) {
+        log("❌ Error getting pending requests: $e");
+        throw e; // Rethrow for retry logic
       }
-    } catch (e) {
-      log("❌ Error getting pending requests: $e");
-      return [];
     }
+    
+    // Main execution with retry logic
+    while (retryCount <= maxRetries) {
+      try {
+        return await attemptRequest();
+      } catch (e) {
+        retryCount++;
+        
+        if (retryCount > maxRetries) {
+          log("❌ All retry attempts failed for getPendingRequests");
+          return []; // Return empty list after all retries failed
+        }
+        
+        // Exponential backoff: 1s, 2s, 4s, etc.
+        final delayMs = initialDelayMs * math.pow(2, retryCount - 1).toInt();
+        log("⏳ Retry $retryCount after $delayMs ms");
+        await Future.delayed(Duration(milliseconds: delayMs));
+      }
+    }
+    
+    return []; // Fallback return if loop exits unexpectedly
   }
 
   Future<bool> acceptRideRequest(String requestId) async {
@@ -594,56 +671,165 @@ class DriverService extends GetConnect {
 
   Future<bool> approveJoinRequest(String requestId, bool approved) async {
     try {
+      // Log the request information for debugging
+      log("📤 Attempting to ${approved ? 'approve' : 'decline'} join request with ID: $requestId");
+      
       final authController = Get.find<AuthController>();
+      final token = authController.token.value;
+      
+      // Use the dedicated endpoint from ApiEndpoints
+      final url = "${ApiEndpoints.joinRequestApprove}/$requestId/approve";
+      log("📤 Request URL: $url");
+      
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+      log("📤 Headers: $headers");
+      
+      final body = {"approved": approved};
+      log("📤 Request body: $body");
+      
       final response = await http.put(
-        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/$requestId/approve"),
-        headers: {
-          'Authorization': 'Bearer ${authController.token.value}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({"approved": approved}),
+        Uri.parse(url),
+        headers: headers,
+        body: jsonEncode(body),
       );
-      log("🛑 Approve join request response: [33m${response.statusCode}");
+      
+      // Log the complete response
+      log("📥 Approve join request response status: [${response.statusCode}]");
+      log("📥 Response body: ${response.body}");
+      
+      // Check the specific error case
+      if (response.statusCode != 200) {
+        log("❌ Failed to ${approved ? 'approve' : 'decline'} request. Status: ${response.statusCode}, Body: ${response.body}");
+        // If there's a specific error message in the response, log it
+        try {
+          final errorData = jsonDecode(response.body);
+          if (errorData.containsKey('message')) {
+            log("❌ Server error message: ${errorData['message']}");
+          }
+        } catch (e) {
+          // Ignore JSON parse errors
+        }
+      }
+      
       return response.statusCode == 200;
     } catch (e) {
-      log("❌ Error approving join request: $e");
+      log("❌ Exception in approveJoinRequest: $e");
       return false;
     }
   }
 
   Future<bool> pickupPassenger(String requestId) async {
     try {
+      log("📤 Attempting to pickup passenger with request ID: $requestId");
+      
       final authController = Get.find<AuthController>();
+      final token = authController.token.value;
+      
+      // Use the dedicated endpoint from ApiEndpoints
+      final url = "${ApiEndpoints.joinRequestPickup}/$requestId/pickup";
+      log("📤 Pickup URL: $url");
+      
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+      
       final response = await http.put(
-        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/$requestId/pickup"),
-        headers: {
-          'Authorization': 'Bearer ${authController.token.value}',
-          'Content-Type': 'application/json',
-        },
+        Uri.parse(url),
+        headers: headers,
       );
-      log("🛑 Pickup passenger response: [33m${response.statusCode}");
+      
+      log("📥 Pickup passenger response: [${response.statusCode}]");
+      log("📥 Response body: ${response.body}");
+      
+      if (response.statusCode != 200) {
+        log("❌ Failed to pickup passenger. Status: ${response.statusCode}, Body: ${response.body}");
+      }
+      
       return response.statusCode == 200;
     } catch (e) {
-      log("❌ Error picking up passenger: $e");
+      log("❌ Exception in pickupPassenger: $e");
       return false;
     }
   }
 
   Future<bool> dropoffPassenger(String requestId) async {
     try {
+      log("📤 Attempting to dropoff passenger with request ID: $requestId");
+      
       final authController = Get.find<AuthController>();
+      final token = authController.token.value;
+      
+      // Use the dedicated endpoint from ApiEndpoints
+      final url = "${ApiEndpoints.joinRequestDropoff}/$requestId/dropoff";
+      log("📤 Dropoff URL: $url");
+      
+      final headers = {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      };
+      
       final response = await http.put(
-        Uri.parse("${ApiEndpoints.baseUrl}/joinRequests/$requestId/dropoff"),
-        headers: {
-          'Authorization': 'Bearer ${authController.token.value}',
-          'Content-Type': 'application/json',
-        },
+        Uri.parse(url),
+        headers: headers,
       );
-      log("🛑 Dropoff passenger response: [33m${response.statusCode}");
+      
+      log("📥 Dropoff passenger response: [${response.statusCode}]");
+      log("📥 Response body: ${response.body}");
+      
+      if (response.statusCode != 200) {
+        log("❌ Failed to dropoff passenger. Status: ${response.statusCode}, Body: ${response.body}");
+      }
+      
       return response.statusCode == 200;
     } catch (e) {
-      log("❌ Error dropping off passenger: $e");
+      log("❌ Exception in dropoffPassenger: $e");
       return false;
+    }
+  }
+
+  // Use a Map to store passengers data in memory for persistence between screens
+  // This allows the data to persist during the app's lifecycle
+  final Map<String, List<Map<String, dynamic>>> _savedPassengersByRideId = {};
+  
+  // Save passengers data for a specific ride
+  Future<void> savePassengers(String rideId, List<Map<String, dynamic>> passengers) async {
+    try {
+      log("💾 Saving ${passengers.length} passengers for ride $rideId");
+      _savedPassengersByRideId[rideId] = List.from(passengers);
+    } catch (e) {
+      log("❌ Error saving passengers: $e");
+    }
+  }
+  
+  // Get saved passengers data for a ride
+  Future<List<Map<String, dynamic>>?> getSavedPassengers(String rideId) async {
+    try {
+      if (_savedPassengersByRideId.containsKey(rideId)) {
+        final savedPassengers = _savedPassengersByRideId[rideId];
+        log("📤 Retrieved ${savedPassengers?.length ?? 0} saved passengers for ride $rideId");
+        return savedPassengers != null ? List.from(savedPassengers) : null;
+      }
+      log("ℹ️ No saved passengers found for ride $rideId");
+      return null;
+    } catch (e) {
+      log("❌ Error getting saved passengers: $e");
+      return null;
+    }
+  }
+  
+  // Clear saved passengers data for a ride
+  Future<void> clearSavedPassengers(String rideId) async {
+    try {
+      if (_savedPassengersByRideId.containsKey(rideId)) {
+        _savedPassengersByRideId.remove(rideId);
+        log("🧹 Cleared saved passengers for ride $rideId");
+      }
+    } catch (e) {
+      log("❌ Error clearing saved passengers: $e");
     }
   }
 }
@@ -692,34 +878,81 @@ class ChatService {
   }
 
   static Future<List<ChatMessage>> fetchMessages(String token, String rideId) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/chat/$rideId/messages'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-    );
-    log('🟦 Chat fetch response (${response.statusCode}): ${response.body}');
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      log('🟦 Chat parsed messages: $data');
-      return data.map((m) => ChatMessage.fromJson(m)).toList();
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/chat/$rideId/messages'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      log('🟦 Chat fetch response (${response.statusCode}): ${response.body}');
+      if (response.statusCode == 200) {
+        try {
+          final List data = jsonDecode(response.body);
+          log('🟦 Chat parsed messages: $data');
+          return data.map((m) => ChatMessage.fromJson(m)).toList();
+        } catch (e) {
+          log('Error parsing chat messages: $e');
+          // If we can't parse the response as a list, return an empty list
+          return [];
+        }
+      } else if (response.statusCode == 404) {
+        // Chat room not found, return empty list
+        log('Chat room not found for ride $rideId');
+        return [];
+      } else if (response.statusCode == 500) {
+        // Server error, log it but return empty list to prevent app crashes
+        log('Server error when fetching messages: ${response.body}');
+        return [];
+      }
+      // For other status codes, throw exception
+      throw Exception('Failed to fetch chat messages: ${response.statusCode}');
+    } catch (e) {
+      log('Error in fetchMessages: $e');
+      // Return empty list rather than throwing to prevent app crashes
+      return [];
     }
-    throw Exception('Failed to fetch chat messages');
   }
 
   static Future<void> sendMessage(String token, String rideId, String message) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/chat/$rideId/messages'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({'content': message}),
-    );
-    log('🟧 Chat send response (${response.statusCode}): ${response.body}');
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to send message: ${response.body}');
+    try {
+      // Try to get driver name first
+      String driverName = 'Driver'; // Default fallback
+      try {
+        final driverService = Get.find<DriverService>();
+        final profile = await driverService.getDriverProfile();
+        final firstName = profile['firstName'] ?? '';
+        final lastName = profile['lastName'] ?? '';
+        final fullName = (firstName + ' ' + lastName).trim();
+        if (fullName.isNotEmpty) {
+          driverName = fullName;
+        }
+      } catch (e) {
+        log('⚠️ Could not get driver name for chat: $e');
+      }
+      
+      // Send message with the driver name included
+      final response = await http.post(
+        Uri.parse('$baseUrl/chat/$rideId/messages'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'content': message,
+          'senderName': driverName, // Include sender name in request
+        }),
+      );
+      
+      log('🟧 Chat send response (${response.statusCode}): ${response.body}');
+      
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Failed to send message: ${response.body}');
+      }
+    } catch (e) {
+      log('❌ Error sending message: $e');
+      throw e;
     }
   }
 }

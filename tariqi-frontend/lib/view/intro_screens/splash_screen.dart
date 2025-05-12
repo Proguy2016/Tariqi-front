@@ -36,7 +36,7 @@ class SplashScreen extends StatelessWidget {
                   Colors.black.withOpacity(0.25),
                 ],
                 stops: [0.0, 0.5, 1.0],
-              ),
+            ),
             ),
           ),
           SafeArea(
@@ -47,21 +47,21 @@ class SplashScreen extends StatelessWidget {
                 // Logo and app name centered together
                 Center(
                   child: Column(
-                    children: [
+                  children: [
                       Container(
                         width: ScreenSize.screenWidth! * 0.22,
                         height: ScreenSize.screenWidth! * 0.22,
-                        decoration: BoxDecoration(
+      decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.85),
                           shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
+        boxShadow: [
+          BoxShadow(
                               color: Colors.black12,
                               blurRadius: 10,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
+            spreadRadius: 1,
+          ),
+        ],
+      ),
                         child: Padding(
                           padding: const EdgeInsets.all(18.0),
                           child: Image.asset(
@@ -82,7 +82,7 @@ class SplashScreen extends StatelessWidget {
                             Shadow(
                               color: Color(0xFF2979FF).withOpacity(0.7), // blue neon
                               blurRadius: 24,
-                            ),
+          ),
                             Shadow(
                               color: Colors.black.withOpacity(0.35),
                               blurRadius: 8,
@@ -103,19 +103,19 @@ class SplashScreen extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.blueColor,
                         padding: const EdgeInsets.symmetric(vertical: 20),
-                        shape: RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(40),
-                        ),
+        ),
                         elevation: 10,
                         shadowColor: AppColors.blueColor.withOpacity(0.4),
-                      ),
-                      onPressed: () {
+        ),
+        onPressed: () {
                         controller.navigateToLoginScreen();
-                      },
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
-                          Text(
+            Text(
                             'Get Started',
                             style: TextStyle(
                               fontSize: 26,
@@ -123,7 +123,7 @@ class SplashScreen extends StatelessWidget {
                               color: Colors.white,
                               letterSpacing: 1.1,
                             ),
-                          ),
+            ),
                           SizedBox(width: 16),
                           Icon(
                             Icons.arrow_circle_right_outlined,
@@ -135,8 +135,8 @@ class SplashScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
+          ],
+        ),
           ),
         ],
       ),
